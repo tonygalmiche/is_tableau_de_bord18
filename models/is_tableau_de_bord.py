@@ -224,14 +224,27 @@ class IsTableauDeBordLine(models.Model):
     def action_edit_filter(self):
         """Ouvrir la fiche du filtre pour modification"""
         self.ensure_one()
-        if self.filter_id:
+        if not self.filter_id:
             return {
-                'type': 'ir.actions.act_window',
-                'name': 'Modifier la recherche enregistrée',
-                'res_model': 'ir.filters',
-                'res_id': self.filter_id.id,
-                'view_mode': 'form',
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': 'Aucun filtre',
+                    'message': 'Aucune recherche enregistrée n\'est associée à cette ligne.',
+                    'type': 'warning',
+                    'sticky': False,
+                }
             }
+        
+        return {
+            'type': 'ir.actions.act_window',
+            'name': 'Modifier la recherche enregistrée',
+            'res_model': 'ir.filters',
+            'res_id': self.filter_id.id,
+            'view_mode': 'form',
+            'views': [[False, 'form']],
+            'target': 'current',
+        }
 
     def action_duplicate_line(self):
         """Dupliquer la ligne du tableau de bord"""

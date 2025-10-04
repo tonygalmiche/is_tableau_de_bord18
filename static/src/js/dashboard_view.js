@@ -79,6 +79,9 @@ export class DashboardFormController extends FormController {
                             <a href="#" class="btn btn-sm btn-outline-primary open-filter-link" data-line-id="${serverLineId}" title="Ouvrir la recherche complète en plein écran">
                                 <i class="fa fa-expand"></i> Plein écran
                             </a>
+                            <a href="#" class="btn btn-sm btn-outline-secondary edit-filter-link ms-2" data-line-id="${serverLineId}" title="Modifier le filtre">
+                                <i class="fa fa-search"></i>
+                            </a>
                         </div>
                     </div>
                 </div>
@@ -92,6 +95,7 @@ export class DashboardFormController extends FormController {
     // Ajouter les gestionnaires d'événements pour les liens "Ouvrir en plein écran"
     setTimeout(() => {
         this.attachOpenFilterLinks();
+        this.attachEditFilterLinks();
     }, 100);
     }
 
@@ -110,6 +114,25 @@ export class DashboardFormController extends FormController {
                 }
                 
                 await this.openFilterFullScreen(lineId);
+            });
+        });
+    }
+
+    attachEditFilterLinks() {
+        const links = document.querySelectorAll('.edit-filter-link');
+        console.log("[TDB] Attaching event listeners to", links.length, "edit filter links");
+        
+        links.forEach(link => {
+            link.addEventListener('click', async (e) => {
+                e.preventDefault();
+                const lineId = parseInt(link.dataset.lineId);
+                
+                if (!lineId) {
+                    console.warn("[TDB] Pas de lineId pour ce lien d'édition");
+                    return;
+                }
+                
+                await this.editFilter(lineId);
             });
         });
     }
@@ -135,6 +158,30 @@ export class DashboardFormController extends FormController {
             
         } catch (error) {
             console.error("[TDB] Erreur lors de l'ouverture du filtre:", error);
+        }
+    }
+
+    async editFilter(lineId) {
+        try {
+            console.log("[TDB] Édition du filtre pour la ligne", lineId, "via action_edit_filter");
+            
+            // Appeler la méthode Python action_edit_filter sur le modèle is.tableau.de.bord.line
+            const result = await rpc("/web/dataset/call_kw/is.tableau.de.bord.line/action_edit_filter", {
+                model: 'is.tableau.de.bord.line',
+                method: 'action_edit_filter',
+                args: [[lineId]],
+                kwargs: {}
+            });
+            
+            if (result && result.type) {
+                // Exécuter l'action retournée par Python
+                await this.actionService.doAction(result);
+            } else {
+                console.warn("[TDB] Aucune action retournée par action_edit_filter");
+            }
+            
+        } catch (error) {
+            console.error("[TDB] Erreur lors de l'édition du filtre:", error);
         }
     }
 
@@ -461,9 +508,21 @@ registry.category("views").add("form", {
             }
         }
         
+        attachEditFilterLinks() {
+            if (this.props.context?.dashboard_mode) {
+                return DashboardFormController.prototype.attachEditFilterLinks.call(this);
+            }
+        }
+        
         async openFilterFullScreen(lineId) {
             if (this.props.context?.dashboard_mode) {
                 return DashboardFormController.prototype.openFilterFullScreen.call(this, lineId);
+            }
+        }
+        
+        async editFilter(lineId) {
+            if (this.props.context?.dashboard_mode) {
+                return DashboardFormController.prototype.editFilter.call(this, lineId);
             }
         }
     }
