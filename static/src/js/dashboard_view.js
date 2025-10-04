@@ -56,6 +56,9 @@ export class DashboardFormController extends FormController {
                 filterId = line.filter_id;
             }
             
+            // Récupérer l'ID serveur de la ligne
+            const serverLineId = lineRecord.resId || line.id || (line._values && line._values.id) || lineRecord.id;
+            
             const widthCol = parseInt(line.width || 6, 10);
             const heightPx = parseInt(line.height || 400, 10);
             html += `
@@ -73,7 +76,7 @@ export class DashboardFormController extends FormController {
                             </div>
                         </div>
                         <div class="card-footer text-center py-2" style="background-color: #f8f9fa; border-top: 1px solid #dee2e6;">
-                            <a href="#" class="btn btn-sm btn-outline-primary open-filter-link" data-filter-id="${filterId}" data-line-id="${lineRecord.id}" title="Ouvrir la recherche complète en plein écran">
+                            <a href="#" class="btn btn-sm btn-outline-primary open-filter-link" data-line-id="${serverLineId}" title="Ouvrir la recherche complète en plein écran">
                                 <i class="fa fa-expand"></i> Plein écran
                             </a>
                         </div>
@@ -217,13 +220,22 @@ export class DashboardFormController extends FormController {
             return;
         }
 
-    console.log('[TDB] Render LIST with fields:', data.fields);
-    let html = '<div class="table-responsive h-100"><table class="table table-sm table-striped mb-0">';
+        console.log('[TDB] Render LIST with fields:', data.fields);
+        
+        // Filtrer les champs invalides
+        const validFields = (data.fields || []).filter(f => f !== null && f !== undefined);
+        
+        if (validFields.length === 0) {
+            container.innerHTML = '<div class="alert alert-warning m-2">Aucun champ à afficher</div>';
+            return;
+        }
+        
+        let html = '<div class="table-responsive h-100"><table class="table table-sm table-striped mb-0">';
         
         // En-têtes
         html += '<thead><tr>';
-    for (const f of data.fields) {
-            const label = typeof f === 'string' ? f : (f.string || f.name);
+        for (const f of validFields) {
+            const label = typeof f === 'string' ? f : (f?.string || f?.name || 'Sans nom');
             html += `<th>${label}</th>`;
         }
         html += '</tr></thead>';
@@ -232,8 +244,8 @@ export class DashboardFormController extends FormController {
         html += '<tbody>';
         for (const row of data.data) {
             html += '<tr>';
-            for (const f of data.fields) {
-                const name = typeof f === 'string' ? f : f.name;
+            for (const f of validFields) {
+                const name = typeof f === 'string' ? f : (f?.name || '');
                 let val = row[name];
                 if (Array.isArray(val)) {
                     // many2one: [id, display]
