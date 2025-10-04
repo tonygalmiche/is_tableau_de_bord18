@@ -335,55 +335,84 @@ class TableauDeBordController(http.Controller):
                     for node in root.xpath('//list/field | //tree/field'):
                         name = node.get('name')
                         if name and name not in names:
-                            if node.get('invisible') in ('1', 'True', 'true'):
-                                continue
+                            # Ne pas filtrer les champs invisibles - on veut toutes les colonnes
+                            # if node.get('invisible') in ('1', 'True', 'true'):
+                            #     continue
                             names.append(name)
                 return names, fields_def
 
-            view = model.fields_view_get(view_id=view_id, view_type=vt_primary)
-            field_names, fields_def = _extract(view)
+            _logger.info("[TDB] Getting fields for model=%s view_type=%s view_id=%s", model._name, vt_primary, view_id)
+            
+            # Vérifier si le modèle a la méthode fields_view_get
+            if hasattr(model, 'fields_view_get'):
+                view = model.fields_view_get(view_id=view_id, view_type=vt_primary)
+                field_names, fields_def = _extract(view)
+                _logger.info("[TDB] Primary view extraction: %s fields", len(field_names))
 
-            if not field_names:
-                view2 = model.fields_view_get(view_type=vt_fallback)
-                field_names, fields_def = _extract(view2)
-
-            if len(field_names) <= 1:
-                View = request.env['ir.ui.view'].sudo()
-                candidates = View.search([
-                    ('model', '=', model._name),
-                    ('type', 'in', ['list', 'tree'])
-                ], order='priority, id')
-                for v in candidates:
-                    try:
-                        vt = v.type or 'list'
-                        vres = model.fields_view_get(view_id=v.id, view_type=vt)
-                        fn, fd = _extract(vres)
-                        if len(fn) > 1:
-                            field_names, fields_def = fn, fd
-                            break
-                    except Exception:
-                        continue
-
-            if not field_names:
-                # essayer une liste de champs usuels fréquents
-                preference = [
-                    'name', 'display_name', 'date', 'invoice_date', 'create_date', 'write_date', 'ref',
-                    'partner_id', 'user_id', 'company_id', 'state', 'amount_total', 'amount_untaxed', 'amount_tax',
-                ]
-                # filtrer par champs existants côté modèle
-                field_names = [f for f in preference if f in model._fields]
                 if not field_names:
-                    # fallback générique: prendre quelques champs non x2many/binary
-                    for fname, fdef in model._fields.items():
-                        t = getattr(fdef, 'type', '')
-                        if t in ('one2many', 'many2many', 'binary'):
-                            continue
-                        field_names.append(fname)
-                        if len(field_names) >= 6:
-                            break
+                    _logger.info("[TDB] Trying fallback view type: %s", vt_fallback)
+                    view2 = model.fields_view_get(view_type=vt_fallback)
+                    field_names, fields_def = _extract(view2)
+                    _logger.info("[TDB] Fallback view extraction: %s fields", len(field_names))
 
-            field_names = field_names[:8]
+                if len(field_names) <= 1:
+                    _logger.info("[TDB] Searching for alternative views in ir.ui.view")
+                    View = request.env['ir.ui.view'].sudo()
+                    candidates = View.search([
+                        ('model', '=', model._name),
+                        ('type', 'in', ['list', 'tree'])
+                    ], order='priority, id')
+                    _logger.info("[TDB] Found %s candidate views", len(candidates))
+                    for v in candidates:
+                        try:
+                            vt = v.type or 'list'
+                            vres = model.fields_view_get(view_id=v.id, view_type=vt)
+                            fn, fd = _extract(vres)
+                            if len(fn) > 1:
+                                field_names, fields_def = fn, fd
+                                _logger.info("[TDB] Using alternative view %s with %s fields", v.id, len(fn))
+                                break
+                        except Exception as e:
+                            _logger.debug("[TDB] Failed to load view %s: %s", v.id, e)
+                            continue
+            else:
+                _logger.info("[TDB] Model %s has no fields_view_get method, using fields directly", model._name)
+                field_names = []
+                fields_def = {}
+
+            if not field_names:
+                _logger.warning("[TDB] No fields found in views, using model fields directly")
+                # Récupérer tous les champs du modèle (sauf relations complexes et binaires)
+                field_names = []
+                for fname, fdef in model._fields.items():
+                    t = getattr(fdef, 'type', '')
+                    # Exclure les champs techniques et complexes
+                    if fname.startswith('_'):
+                        continue
+                    if t in ('one2many', 'many2many', 'binary'):
+                        continue
+                    # Inclure les champs standards
+                    field_names.append(fname)
+                
+                # Limiter à 15 champs pour ne pas surcharger l'affichage
+                if len(field_names) > 15:
+                    # Préférer certains champs communs
+                    preference = [
+                        'name', 'display_name', 'date', 'invoice_date', 'partner_id', 'amount_total', 
+                        'amount_untaxed', 'amount_tax', 'user_id', 'company_id', 'state', 'ref',
+                        'create_date', 'write_date'
+                    ]
+                    preferred = [f for f in preference if f in field_names]
+                    others = [f for f in field_names if f not in preference]
+                    field_names = preferred + others[:15-len(preferred)]
+                
+                # Récupérer les définitions des champs
+                fields_def = model.fields_get(field_names)
+
+            # Ne pas limiter le nombre de champs pour afficher toutes les colonnes de la vue
+            _logger.info("[TDB] Final field list: %s fields - %s", len(field_names), field_names[:10])
             labels = {fn: fields_def.get(fn, {}).get('string', fn) for fn in field_names}
             return field_names, labels
-        except Exception:
+        except Exception as e:
+            _logger.exception("[TDB] Error in _get_fields_from_view: %s", e)
             return ['display_name'], {'display_name': 'Nom à afficher'}
