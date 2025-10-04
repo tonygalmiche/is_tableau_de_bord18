@@ -99,74 +99,36 @@ export class DashboardFormController extends FormController {
         links.forEach(link => {
             link.addEventListener('click', async (e) => {
                 e.preventDefault();
-                const filterId = parseInt(link.dataset.filterId);
-                const lineId = link.dataset.lineId;
+                const lineId = parseInt(link.dataset.lineId);
                 
-                if (!filterId) {
-                    console.warn("[TDB] Pas de filterId pour ce lien");
+                if (!lineId) {
+                    console.warn("[TDB] Pas de lineId pour ce lien");
                     return;
                 }
                 
-                await this.openFilterFullScreen(filterId);
+                await this.openFilterFullScreen(lineId);
             });
         });
     }
 
-    async openFilterFullScreen(filterId) {
+    async openFilterFullScreen(lineId) {
         try {
-            console.log("[TDB] Ouverture du filtre", filterId, "en plein écran");
+            console.log("[TDB] Ouverture du filtre pour la ligne", lineId, "via action_open_filter");
             
-            // Récupérer les informations du filtre
-            const filterData = await rpc("/web/dataset/call_kw/ir.filters/read", {
-                model: 'ir.filters',
-                method: 'read',
-                args: [[filterId], ['name', 'model_id', 'context', 'domain', 'sort']],
+            // Appeler la méthode Python action_open_filter sur le modèle is.tableau.de.bord.line
+            const result = await rpc("/web/dataset/call_kw/is.tableau.de.bord.line/action_open_filter", {
+                model: 'is.tableau.de.bord.line',
+                method: 'action_open_filter',
+                args: [[lineId]],
                 kwargs: {}
             });
             
-            if (!filterData || filterData.length === 0) {
-                console.error("[TDB] Filtre non trouvé:", filterId);
-                return;
+            if (result && result.type) {
+                // Exécuter l'action retournée par Python
+                await this.actionService.doAction(result);
+            } else {
+                console.warn("[TDB] Aucune action retournée par action_open_filter");
             }
-            
-            const filter = filterData[0];
-            const modelName = filter.model_id[1]; // [id, name]
-            
-            // Préparer le contexte
-            let context = {};
-            try {
-                if (filter.context) {
-                    context = typeof filter.context === 'string' 
-                        ? JSON.parse(filter.context) 
-                        : filter.context;
-                }
-            } catch (e) {
-                console.warn("[TDB] Erreur lors du parsing du contexte:", e);
-            }
-            
-            // Préparer le domaine
-            let domain = [];
-            try {
-                if (filter.domain) {
-                    domain = typeof filter.domain === 'string' 
-                        ? JSON.parse(filter.domain) 
-                        : filter.domain;
-                }
-            } catch (e) {
-                console.warn("[TDB] Erreur lors du parsing du domaine:", e);
-            }
-            
-            // Ouvrir l'action
-            await this.actionService.doAction({
-                type: 'ir.actions.act_window',
-                name: filter.name,
-                res_model: filter.model_id[0],
-                views: context.group_by ? [[false, 'list'], [false, 'form']] : [[false, 'list'], [false, 'graph'], [false, 'pivot'], [false, 'form']],
-                view_mode: context.group_by ? 'list,form' : 'list,graph,pivot,form',
-                domain: domain,
-                context: context,
-                target: 'current',
-            });
             
         } catch (error) {
             console.error("[TDB] Erreur lors de l'ouverture du filtre:", error);
@@ -487,9 +449,9 @@ registry.category("views").add("form", {
             }
         }
         
-        async openFilterFullScreen(filterId) {
+        async openFilterFullScreen(lineId) {
             if (this.props.context?.dashboard_mode) {
-                return DashboardFormController.prototype.openFilterFullScreen.call(this, filterId);
+                return DashboardFormController.prototype.openFilterFullScreen.call(this, lineId);
             }
         }
     }

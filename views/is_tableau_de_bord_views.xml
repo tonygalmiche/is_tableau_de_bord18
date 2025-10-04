@@ -14,54 +14,60 @@
                 <sheet>
                     <group>
                         <field name="name"/>
-                        <field name="active"/>
                     </group>
-                    <notebook>
-                        <page string="Éléments du tableau de bord">
-                            <field name="line_ids">
-                                <list>
-                                    <field name="sequence" widget="handle"/>
-                                    <field name="name"/>
-                                    <field name="model_id"/>
-                                    <field name="filter_id"/>
-                                    <field name="width"/>
-                                    <field name="height"/>
-                                    <field name="display_mode"/>
-                                </list>
-                                <form>
-                                    <sheet>
+                    <group string="Éléments du tableau de bord">
+                        <field name="line_ids">
+                            <list>
+                                <field name="sequence" widget="handle"/>
+                                <button name="action_open_filter" type="object" icon="fa-eye"    title="Ouvrir en plein écran" invisible="not filter_id"/>
+                                <button name="action_edit_filter" type="object" icon="fa-search" title="Ouvrir le filtre"      invisible="not filter_id"/>
+                                <field name="name"/>
+                                <field name="model_id" optional="show"/>
+                                <field name="user_id" optional="hide"/>
+                                <field name="filter_id" optional="hide"/>
+                                <field name="width" optional="show"/>
+                                <field name="height" optional="show"/>
+                                <field name="display_mode" optional="show"/>
+                                <field name="graph_chart_type" optional="hide"/>
+                                <field name="graph_aggregator" optional="hide"/>
+                                <field name="pivot_row_groupby" optional="hide"/>
+                                <field name="pivot_col_groupby" optional="hide"/>
+                                <field name="pivot_measure" optional="hide"/>
+                            </list>
+                            <form>
+                                <sheet>
+                                    <group>
                                         <group>
-                                            <group>
-                                                <field name="model_id" options="{'no_create': True, 'no_open': True}"/>
-                                                <field name="filter_id" options="{'no_create': True}"/>
-                                            </group>
-                                            <group>
-                                                <field name="name"/>
-                                                <field name="width"/>
-                                                <field name="height"/>
-                                                <field name="display_mode"/>
-                                            </group>
+                                            <field name="model_ids" invisible="1"/>
+                                            <field name="model_id" options="{'no_create': True, 'no_open': True}" domain="[('id', 'in', model_ids)]"/>
+                                            <field name="user_id" options="{'no_create': True}"/>
+                                            <field name="filter_domain" invisible="1"/>
+                                            <field name="filter_id" options="{'no_create': True}" domain="filter_domain"/>
                                         </group>
-                                        <notebook>
-                                            <page string="Configuration graphique" invisible="display_mode not in ['auto', 'graph']">
-                                                <group>
-                                                    <field name="graph_chart_type"/>
-                                                    <field name="graph_aggregator"/>
-                                                </group>
-                                            </page>
-                                            <page string="Configuration pivot" invisible="display_mode not in ['auto', 'pivot']">
-                                                <group>
-                                                    <field name="pivot_row_groupby"/>
-                                                    <field name="pivot_col_groupby"/>
-                                                    <field name="pivot_measure"/>
-                                                </group>
-                                            </page>
-                                        </notebook>
-                                    </sheet>
-                                </form>
-                            </field>
-                        </page>
-                    </notebook>
+                                        <group>
+                                            <field name="name"/>
+                                            <field name="width"/>
+                                            <field name="height"/>
+                                        </group>
+                                    </group>
+                                    <group string="Configuration">
+                                        <group>
+                                            <field name="display_mode"/>
+                                        </group>
+                                        <group invisible="display_mode not in ['graph']">
+                                            <field name="graph_chart_type"/>
+                                            <field name="graph_aggregator"/>
+                                        </group>
+                                        <group invisible="display_mode not in ['pivot']">
+                                            <field name="pivot_row_groupby"/>
+                                            <field name="pivot_col_groupby"/>
+                                            <field name="pivot_measure"/>
+                                        </group>
+                                    </group>
+                                </sheet>
+                            </form>
+                        </field>
+                    </group>
                 </sheet>
             </form>
         </field>
@@ -73,9 +79,8 @@
         <field name="model">is.tableau.de.bord</field>
         <field name="arch" type="xml">
             <list string="Tableaux de bord">
-                <field name="name"/>
-                <field name="active"/>
                 <button name="action_view_dashboard" string="Voir" type="object" icon="fa-eye"/>
+                <field name="name"/>
             </list>
         </field>
     </record>
@@ -142,6 +147,7 @@
                                 <field name="sequence"/>
                                 <field name="name"/>
                                 <field name="model_id"/>
+                                <field name="user_id"/>
                                 <field name="filter_id"/>
                                 <field name="width"/>
                                 <field name="height"/>
