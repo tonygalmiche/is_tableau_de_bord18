@@ -36,8 +36,9 @@ class IsTableauDeBordLine(models.Model):
     name = fields.Char('Nom', required=True)
     sequence = fields.Integer('Séquence', default=10)
     
-    # Sélection de la recherche enregistrée
-    filter_id = fields.Many2one('ir.filters', string='Recherche enregistrée')
+    # Sélection du modèle et de la recherche enregistrée
+    model_id = fields.Many2one('ir.model', string='Modèle', help='Sélectionnez le modèle pour filtrer les recherches enregistrées')
+    filter_id = fields.Many2one('ir.filters', string='Recherche enregistrée', domain="[('model_id', '=', model_id)]")
     
     # Configuration de l'affichage
     width = fields.Selection([
@@ -80,8 +81,17 @@ class IsTableauDeBordLine(models.Model):
     pivot_col_groupby = fields.Char('Pivot: Groupe colonnes')
     pivot_measure = fields.Char('Pivot: Mesure (champ numérique)')
 
+    @api.onchange('model_id')
+    def _onchange_model_id(self):
+        """Réinitialiser le filtre si le modèle change"""
+        if self.model_id and self.filter_id and self.filter_id.model_id != self.model_id.model:
+            self.filter_id = False
+
     @api.onchange('filter_id')
     def _onchange_filter_id(self):
-        """Remplir automatiquement le nom avec celui du filtre"""
+        """Remplir automatiquement le nom et le modèle avec ceux du filtre"""
         if self.filter_id:
             self.name = self.filter_id.name
+            # Mettre à jour le modèle si pas encore défini
+            if not self.model_id:
+                self.model_id = self.env['ir.model'].search([('model', '=', self.filter_id.model_id)], limit=1)

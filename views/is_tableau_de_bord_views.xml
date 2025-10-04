@@ -19,19 +19,46 @@
                     <notebook>
                         <page string="Éléments du tableau de bord">
                             <field name="line_ids">
-                                <list editable="bottom">
+                                <list>
                                     <field name="sequence" widget="handle"/>
                                     <field name="name"/>
+                                    <field name="model_id"/>
                                     <field name="filter_id"/>
                                     <field name="width"/>
                                     <field name="height"/>
                                     <field name="display_mode"/>
-                                    <field name="graph_chart_type"/>
-                                    <field name="graph_aggregator"/>
-                                    <field name="pivot_row_groupby"/>
-                                    <field name="pivot_col_groupby"/>
-                                    <field name="pivot_measure"/>
                                 </list>
+                                <form>
+                                    <sheet>
+                                        <group>
+                                            <group>
+                                                <field name="model_id" options="{'no_create': True, 'no_open': True}"/>
+                                                <field name="filter_id" options="{'no_create': True}"/>
+                                            </group>
+                                            <group>
+                                                <field name="name"/>
+                                                <field name="width"/>
+                                                <field name="height"/>
+                                                <field name="display_mode"/>
+                                            </group>
+                                        </group>
+                                        <notebook>
+                                            <page string="Configuration graphique" invisible="display_mode not in ['auto', 'graph']">
+                                                <group>
+                                                    <field name="graph_chart_type"/>
+                                                    <field name="graph_aggregator"/>
+                                                </group>
+                                            </page>
+                                            <page string="Configuration pivot" invisible="display_mode not in ['auto', 'pivot']">
+                                                <group>
+                                                    <field name="pivot_row_groupby"/>
+                                                    <field name="pivot_col_groupby"/>
+                                                    <field name="pivot_measure"/>
+                                                </group>
+                                            </page>
+                                        </notebook>
+                                    </sheet>
+                                </form>
                             </field>
                         </page>
                     </notebook>
@@ -114,6 +141,7 @@
                             <list>
                                 <field name="sequence"/>
                                 <field name="name"/>
+                                <field name="model_id"/>
                                 <field name="filter_id"/>
                                 <field name="width"/>
                                 <field name="height"/>
