@@ -101,14 +101,23 @@ class TableauDeBordController(http.Controller):
 
     def _get_view_type_from_context(self, context):
         """Détermine le type de vue à partir du contexte"""
+        # Priorité 1: display_mode explicite (depuis la ligne du tableau de bord)
+        if 'search_default_view_type' in context:
+            view_type = context.get('search_default_view_type', '')
+            if 'graph' in view_type:
+                return 'graph'
+            if 'pivot' in view_type:
+                return 'pivot'
+            if 'list' in view_type:
+                return 'list'
+        
+        # Priorité 2: paramètres spécifiques au type de vue
         if context.get('graph_measure') or context.get('graph_groupbys'):
             return 'graph'
         if context.get('pivot_measures') or context.get('pivot_row_groupby') or context.get('pivot_column_groupby'):
             return 'pivot'
-        if 'graph' in context.get('search_default_view_type', ''):
-            return 'graph'
-        if 'pivot' in context.get('search_default_view_type', ''):
-            return 'pivot'
+        
+        # Par défaut: liste
         return 'list'
 
     def _get_list_data(self, model, filter_obj, domain, context):
