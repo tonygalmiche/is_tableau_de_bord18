@@ -222,22 +222,57 @@ class TableauDeBordController(http.Controller):
         }
 
     def _get_pivot_data(self, model, filter_obj, domain, context):
-        """Génère les données pour un tableau croisé; support 1D (lignes) et 2D (lignes x colonnes)."""
-        row_gb = context.get('pivot_row_groupby') or context.get('group_by')
+        """Génère les données pour un tableau croisé; support 1D (lignes) et 2D (lignes x colonnes).
+        Utilise les informations du contexte du filtre pour respecter les paramètres de la vue pivot standard."""
+        
+        # Récupérer les groupements et mesures depuis le contexte (priorité au contexte du filtre)
+        row_gb = context.get('pivot_row_groupby') or context.get('graph_groupbys') or context.get('group_by')
         if isinstance(row_gb, list):
             row_gb = row_gb[0] if row_gb else None
+        
         col_gb = context.get('pivot_column_groupby')
         if isinstance(col_gb, list):
             col_gb = col_gb[0] if col_gb else None
-        measures = context.get('pivot_measures') or context.get('measure')
+        
+        # Pour la mesure, utiliser graph_measure du contexte si pivot_measures n'est pas défini
+        measures = context.get('pivot_measures') or context.get('graph_measure') or context.get('measure')
         if isinstance(measures, list):
             measure = measures[0] if measures else None
         else:
             measure = measures
-        _logger.info("[TDB] pivot row_gb=%s col_gb=%s measure=%s", row_gb, col_gb, measure)
+        
+        _logger.info("[TDB] pivot row_gb=%s col_gb=%s measure=%s context_keys=%s", 
+                     row_gb, col_gb, measure, list(context.keys()))
 
         use_count = not measure or str(measure) in ('count', '__count')
         fields = [] if use_count else [f"{measure}:sum"]
+        
+        # Récupérer le libellé de la mesure
+        measure_label = "Nombre"
+        if measure and measure not in ('count', '__count'):
+            try:
+                field_info = model.fields_get([measure])
+                measure_label = field_info.get(measure, {}).get('string', measure)
+            except Exception:
+                measure_label = measure
+        
+        # Récupérer les libellés des groupements
+        row_label = "Lignes"
+        col_label = "Colonnes"
+        if row_gb:
+            try:
+                row_field = row_gb.split(':')[0]
+                field_info = model.fields_get([row_field])
+                row_label = field_info.get(row_field, {}).get('string', row_field)
+            except Exception:
+                row_label = row_gb
+        if col_gb:
+            try:
+                col_field = col_gb.split(':')[0]
+                field_info = model.fields_get([col_field])
+                col_label = field_info.get(col_field, {}).get('string', col_field)
+            except Exception:
+                col_label = col_gb
 
         if row_gb and col_gb:
             # 2D pivot
@@ -252,7 +287,14 @@ class TableauDeBordController(http.Controller):
                 full = (gb or '')
                 base = full.split(':')[0]
                 # tenter d'abord la clé complète (utile pour date gb: field:year)
-                return rec.get(f"{full}_name") or rec.get(f"{base}_name") or rec.get(full) or rec.get(base) or 'Indéfini'
+                val = rec.get(full) or rec.get(base)
+                # Pour les many2one, prendre le display_name
+                if isinstance(val, (list, tuple)) and len(val) > 1:
+                    return val[1]  # [id, display_name]
+                # Pour les dates avec groupement temporel
+                if rec.get(f"{base}") and ':' in full:
+                    return str(val) if val else 'Indéfini'
+                return str(val) if val is not None else 'Indéfini'
             # build rows structure
             rows_map = {}
             for r in results:
@@ -281,6 +323,9 @@ class TableauDeBordController(http.Controller):
                 'data': {
                     'columns': columns,
                     'rows': rows,
+                    'measure_label': measure_label,
+                    'row_label': row_label,
+                    'col_label': col_label,
                 },
             }
 
@@ -292,11 +337,16 @@ class TableauDeBordController(http.Controller):
                 for r in results:
                     full = (row_gb or '')
                     base = full.split(':')[0]
-                    label = r.get(f"{full}_name") or r.get(f"{base}_name") or r.get(full) or r.get(base) or 'Indéfini'
+                    val = r.get(full) or r.get(base)
+                    # Pour les many2one, prendre le display_name
+                    if isinstance(val, (list, tuple)) and len(val) > 1:
+                        label = val[1]  # [id, display_name]
+                    else:
+                        label = str(val) if val is not None else 'Indéfini'
                     value = (r.get('__count') if use_count else (r.get(f"{measure}_sum") or r.get(measure))) or 0
                     data_rows.append({'row': label, 'value': value})
-            except Exception:
-                pass
+            except Exception as e:
+                _logger.exception("[TDB] Error in 1D pivot: %s", e)
 
         if not data_rows:
             # Retourner un total cohérent (sum de measure si défini, sinon count)
@@ -316,6 +366,8 @@ class TableauDeBordController(http.Controller):
         return {
             'type': 'pivot',
             'data': data_rows,
+            'measure_label': measure_label,
+            'row_label': row_label,
         }
 
     def _get_fields_from_view(self, model, view_type, view_id=None):

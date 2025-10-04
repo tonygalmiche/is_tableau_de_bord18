@@ -55,6 +55,38 @@
     vertical-align: middle;
 }
 
+/* Styles spécifiques pour les tableaux pivot */
+.table-hover tbody tr:hover {
+    background-color: rgba(0, 123, 255, 0.05);
+}
+
+.dashboard-item table.table-sm {
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.dashboard-item table.table-sm thead th {
+    background-color: #f1f3f5;
+    font-weight: 600;
+    padding: 0.5rem 0.75rem;
+}
+
+.dashboard-item table.table-sm tbody td {
+    padding: 0.4rem 0.75rem;
+}
+
+.dashboard-item .table-secondary {
+    background-color: #e9ecef !important;
+}
+
+.dashboard-item .border-end {
+    border-right: 1px solid #dee2e6 !important;
+}
+
+.dashboard-item .border-start {
+    border-left: 1px solid #dee2e6 !important;
+}
+
 /* Masquer les éléments de formulaire en mode dashboard */
 .o_dashboard_form .o_form_statusbar,
 .o_dashboard_form .o_form_button_box,

@@ -376,43 +376,89 @@ export class DashboardFormController extends FormController {
         }
     }
 
+    formatNumber(value) {
+        if (value === null || value === undefined) return '0';
+        // Formater avec séparateur de milliers et 2 décimales si nécessaire
+        const num = parseFloat(value);
+        if (isNaN(num)) return value;
+        if (Number.isInteger(num)) {
+            return num.toLocaleString('fr-FR');
+        }
+        return num.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
     renderPivotData(container, data) {
         console.log('[TDB] Render PIVOT with', data);
-        // Support 2D matrix: data.data = { columns: [{label}], rows: [{row, values:[]}] }
+        // Support 2D matrix: data.data = { columns: [{label}], rows: [{row, values:[]}], measure_label, row_label, col_label }
         if (data.data && data.data.columns && data.data.rows) {
             const cols = data.data.columns;
             const rows = data.data.rows;
-            let html = '<div class="h-100 d-flex flex-column"><div class="table-responsive flex-grow-1"><table class="table table-sm table-striped mb-0">';
-            // header
-            html += '<thead><tr><th></th>';
-            for (const c of cols) html += `<th class="text-end">${c.label}</th>`;
-            html += '<th class="text-end">Total</th></tr></thead>';
+            const measureLabel = data.data.measure_label || 'Total';
+            const rowLabel = data.data.row_label || 'Lignes';
+            const colLabel = data.data.col_label || 'Colonnes';
+            
+            let html = '<div class="h-100 d-flex flex-column">';
+            html += '<div class="px-2 pt-2"><small class="text-muted">Mesure: <strong>' + measureLabel + '</strong></small></div>';
+            html += '<div class="table-responsive flex-grow-1 px-2"><table class="table table-sm table-hover mb-0" style="font-size: 0.9rem;">';
+            
+            // header avec libellés améliorés
+            html += '<thead class="table-light"><tr>';
+            html += '<th class="border-end" style="background-color: #f8f9fa;">' + rowLabel + '</th>';
+            for (const c of cols) html += '<th class="text-end">' + c.label + '</th>';
+            html += '<th class="text-end border-start fw-bold" style="background-color: #e9ecef;">Total</th></tr></thead>';
+            
             // body
             html += '<tbody>';
             for (const r of rows) {
                 const total = (r.values || []).reduce((a, b) => a + (b || 0), 0);
-                html += `<tr><td class="fw-bold">${r.row}</td>`;
-                for (const v of (r.values || [])) html += `<td class="text-end">${v ?? 0}</td>`;
-                html += `<td class="text-end fw-bold">${total}</td></tr>`;
+                html += '<tr><td class="border-end fw-bold" style="background-color: #fafbfc;">' + r.row + '</td>';
+                for (const v of (r.values || [])) {
+                    const formattedValue = this.formatNumber(v);
+                    html += '<td class="text-end">' + formattedValue + '</td>';
+                }
+                const formattedTotal = this.formatNumber(total);
+                html += '<td class="text-end border-start fw-bold" style="background-color: #f8f9fa;">' + formattedTotal + '</td></tr>';
             }
+            
             // footer totals by column
             const colTotals = cols.map((_, i) => rows.reduce((a, r) => a + (r.values?.[i] || 0), 0));
             const grand = colTotals.reduce((a, b) => a + b, 0);
-            html += '<tr class="table-light"><td class="fw-bold">Total</td>';
-            for (const t of colTotals) html += `<td class="text-end fw-bold">${t}</td>`;
-            html += `<td class="text-end fw-bold">${grand}</td></tr>`;
+            html += '<tr class="table-secondary border-top border-2"><td class="border-end fw-bold">Total</td>';
+            for (const t of colTotals) {
+                const formattedValue = this.formatNumber(t);
+                html += '<td class="text-end fw-bold">' + formattedValue + '</td>';
+            }
+            const formattedGrand = this.formatNumber(grand);
+            html += '<td class="text-end border-start fw-bold">' + formattedGrand + '</td></tr>';
             html += '</tbody></table></div></div>';
             container.innerHTML = html;
             container.className = "dashboard-item h-100";
             return;
         }
 
-        // 1D list fallback
-        let html = '<div class="h-100 d-flex flex-column"><div class="table-responsive flex-grow-1"><table class="table table-sm mb-0">';
+        // 1D list fallback avec libellés améliorés
+        const measureLabel = data.measure_label || 'Valeur';
+        const rowLabel = data.row_label || 'Lignes';
+        
+        let html = '<div class="h-100 d-flex flex-column">';
+        html += '<div class="px-2 pt-2"><small class="text-muted">Mesure: <strong>' + measureLabel + '</strong></small></div>';
+        html += '<div class="table-responsive flex-grow-1 px-2"><table class="table table-sm table-hover mb-0" style="font-size: 0.9rem;">';
+        html += '<thead class="table-light"><tr><th>' + rowLabel + '</th><th class="text-end">' + measureLabel + '</th></tr></thead>';
         html += '<tbody>';
+        
+        let total = 0;
         for (const row of (data.data || [])) {
-            html += `<tr><td>${row.row}</td><td class="text-end fw-bold">${row.value}</td></tr>`;
+            const formattedValue = this.formatNumber(row.value);
+            html += '<tr><td>' + row.row + '</td><td class="text-end fw-bold">' + formattedValue + '</td></tr>';
+            total += (row.value || 0);
         }
+        
+        // Ajouter une ligne de total si plusieurs lignes
+        if (data.data && data.data.length > 1) {
+            const formattedTotal = this.formatNumber(total);
+            html += '<tr class="table-secondary border-top border-2"><td class="fw-bold">Total</td><td class="text-end fw-bold">' + formattedTotal + '</td></tr>';
+        }
+        
         html += '</tbody></table></div></div>';
         container.innerHTML = html;
         container.className = "dashboard-item h-100";
@@ -524,6 +570,20 @@ registry.category("views").add("form", {
             if (this.props.context?.dashboard_mode) {
                 return DashboardFormController.prototype.editFilter.call(this, lineId);
             }
+        }
+        
+        formatNumber(value) {
+            if (this.props.context?.dashboard_mode) {
+                return DashboardFormController.prototype.formatNumber.call(this, value);
+            }
+            // Fallback si pas en mode dashboard
+            if (value === null || value === undefined) return '0';
+            const num = parseFloat(value);
+            if (isNaN(num)) return value;
+            if (Number.isInteger(num)) {
+                return num.toLocaleString('fr-FR');
+            }
+            return num.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
     }
 }, { force: true });
