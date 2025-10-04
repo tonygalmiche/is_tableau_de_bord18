@@ -21,6 +21,7 @@
                                 <field name="sequence" widget="handle"/>
                                 <button name="action_open_filter" type="object" icon="fa-eye"    title="Ouvrir en plein écran" invisible="not filter_id"/>
                                 <button name="action_edit_filter" type="object" icon="fa-search" title="Ouvrir le filtre"      invisible="not filter_id"/>
+                                <button name="action_duplicate_line" type="object" icon="fa-copy" title="Dupliquer cette ligne"/>
                                 <field name="name"/>
                                 <field name="model_id" optional="show"/>
                                 <field name="user_id" optional="hide"/>
@@ -134,8 +135,16 @@
         <field name="arch" type="xml">
             <form string="Tableau de bord" class="o_dashboard_form">
                 <div class="o_dashboard_view">
-                    <div class="o_dashboard_title mb-3">
-                        <h2><field name="name" readonly="1"/></h2>
+                    <div class="o_dashboard_title mb-3 d-flex align-items-center justify-content-between">
+                        <button string="" type="object" name="action_edit_dashboard" class="btn btn-sm btn-light" title="Modifier le tableau de bord">
+                            <i class="fa fa-pencil"/>
+                        </button>
+                        <h2 class="mb-0"><field name="name" readonly="1"/></h2>
+                        <div class="btn-group">
+                            <!-- <button string="" type="object" name="action_back_to_list" class="btn btn-sm btn-light" title="Retour à la liste">
+                                <i class="fa fa-arrow-left"/>
+                            </button> -->
+                        </div>
                     </div>
                     <div id="dashboard_container" class="container-fluid">
                         <!-- Les éléments seront générés dynamiquement par JavaScript -->

@@ -26,6 +26,29 @@ class IsTableauDeBord(models.Model):
             'flags': {'mode': 'readonly'},
         }
 
+    def action_back_to_list(self):
+        """Retour à la liste des tableaux de bord"""
+        return {
+            'type': 'ir.actions.act_window',
+            'name': 'Mes tableaux de bord',
+            'res_model': 'is.tableau.de.bord',
+            'view_mode': 'kanban,list',
+            'domain': [('active', '=', True)],
+            'target': 'main',
+        }
+
+    def action_edit_dashboard(self):
+        """Ouvrir le formulaire d'édition du tableau de bord"""
+        return {
+            'type': 'ir.actions.act_window',
+            'name': 'Modifier le tableau de bord',
+            'res_model': 'is.tableau.de.bord',
+            'view_mode': 'form',
+            'res_id': self.id,
+            'target': 'main',
+            'views': [(self.env.ref('is_tableau_de_bord18.view_is_tableau_de_bord_form').id, 'form')],
+        }
+
 
 class IsTableauDeBordLine(models.Model):
     _name = 'is.tableau.de.bord.line'
@@ -209,3 +232,24 @@ class IsTableauDeBordLine(models.Model):
                 'res_id': self.filter_id.id,
                 'view_mode': 'form',
             }
+
+    def action_duplicate_line(self):
+        """Dupliquer la ligne du tableau de bord"""
+        self.ensure_one()
+        # Copier la ligne
+        new_line = self.copy()
+        # Modifier le nom pour indiquer que c'est une copie
+        new_line.name = f"{self.name} (copie)"
+        # Ajuster la séquence pour placer la nouvelle ligne juste après l'originale
+        #new_line.sequence = self.sequence + 1
+        
+        # return {
+        #     'type': 'ir.actions.client',
+        #     'tag': 'display_notification',
+        #     'params': {
+        #         'title': 'Ligne dupliquée',
+        #         'message': f'La ligne "{self.name}" a été dupliquée avec succès.',
+        #         'type': 'success',
+        #         'sticky': False,
+        #     }
+        # }
