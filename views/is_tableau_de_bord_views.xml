@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    
+    <!-- Vue formulaire du tableau de bord -->
+    <record id="view_is_tableau_de_bord_form" model="ir.ui.view">
+        <field name="name">is.tableau.de.bord.form</field>
+        <field name="model">is.tableau.de.bord</field>
+        <field name="priority" eval="1"/>
+        <field name="arch" type="xml">
+            <form string="Tableau de bord">
+                <header>
+                    <button name="action_view_dashboard" string="Voir le tableau de bord" type="object" class="btn-primary" invisible="not id"/>
+                </header>
+                <sheet>
+                    <group>
+                        <field name="name"/>
+                        <field name="active"/>
+                    </group>
+                    <notebook>
+                        <page string="Éléments du tableau de bord">
+                            <field name="line_ids">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="name"/>
+                                    <field name="filter_id"/>
+                                    <field name="width"/>
+                                    <field name="height"/>
+                                    <field name="display_mode"/>
+                                    <field name="graph_chart_type"/>
+                                    <field name="graph_aggregator"/>
+                                    <field name="pivot_row_groupby"/>
+                                    <field name="pivot_col_groupby"/>
+                                    <field name="pivot_measure"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Vue liste du tableau de bord -->
+    <record id="view_is_tableau_de_bord_list" model="ir.ui.view">
+        <field name="name">is.tableau.de.bord.list</field>
+        <field name="model">is.tableau.de.bord</field>
+        <field name="arch" type="xml">
+            <list string="Tableaux de bord">
+                <field name="name"/>
+                <field name="active"/>
+                <button name="action_view_dashboard" string="Voir" type="object" icon="fa-eye"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Vue kanban pour l'affichage des tableaux de bord -->
+    <record id="view_is_tableau_de_bord_kanban" model="ir.ui.view">
+        <field name="name">is.tableau.de.bord.kanban</field>
+        <field name="model">is.tableau.de.bord</field>
+        <field name="arch" type="xml">
+            <kanban string="Tableaux de bord" class="o_kanban_dashboard">
+                <field name="name"/>
+                <templates>
+                    <t t-name="kanban-box">
+                        <div class="oe_kanban_card oe_kanban_global_click" style="min-height: 150px;">
+                            <div class="o_kanban_card_header">
+                                <div class="o_kanban_card_header_title">
+                                    <div class="o_primary"><strong><field name="name"/></strong></div>
+                                </div>
+                                <div class="o_kanban_manage_button_section">
+                                    <a class="o_kanban_manage_toggle_button" href="#">
+                                        <i class="fa fa-ellipsis-v" role="img" aria-label="Gérer" title="Gérer"/>
+                                    </a>
+                                </div>
+                            </div>
+                            <div class="container o_kanban_card_content">
+                                <div class="row">
+                                    <div class="col-12 text-center">
+                                        <button type="object" name="action_view_dashboard" class="btn btn-primary">
+                                            <i class="fa fa-eye"/> Voir le tableau de bord
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="o_kanban_card_manage_pane dropdown-menu" role="menu">
+                                <a role="menuitem" type="object" name="action_view_dashboard" class="dropdown-item">Voir le tableau de bord</a>
+                                <a role="menuitem" type="edit" class="dropdown-item">Modifier</a>
+                                <a role="menuitem" type="delete" class="dropdown-item">Supprimer</a>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <!-- Vue dashboard personnalisée -->
+    <record id="view_is_tableau_de_bord_dashboard" model="ir.ui.view">
+        <field name="name">is.tableau.de.bord.dashboard</field>
+        <field name="model">is.tableau.de.bord</field>
+        <field name="priority" eval="99"/>
+        <field name="arch" type="xml">
+            <form string="Tableau de bord" class="o_dashboard_form">
+                <div class="o_dashboard_view">
+                    <div class="o_dashboard_title mb-3">
+                        <h2><field name="name" readonly="1"/></h2>
+                    </div>
+                    <div id="dashboard_container" class="container-fluid">
+                        <!-- Les éléments seront générés dynamiquement par JavaScript -->
+                    </div>
+                    <!-- Champs cachés pour accéder aux données -->
+                    <div style="display: none;">
+                        <field name="line_ids" readonly="1">
+                            <list>
+                                <field name="sequence"/>
+                                <field name="name"/>
+                                <field name="filter_id"/>
+                                <field name="width"/>
+                                <field name="height"/>
+                                <field name="display_mode"/>
+                                <field name="graph_chart_type"/>
+                                <field name="graph_aggregator"/>
+                                <field name="pivot_row_groupby"/>
+                                <field name="pivot_col_groupby"/>
+                                <field name="pivot_measure"/>
+                            </list>
+                        </field>
+                    </div>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <!-- Actions -->
+    <!-- Action pour la gestion des tableaux de bord -->
+    <record id="action_is_tableau_de_bord_manage" model="ir.actions.act_window">
+        <field name="name">Gestion des tableaux de bord</field>
+        <field name="res_model">is.tableau.de.bord</field>
+        <field name="view_mode">list,form</field>
+        <field name="view_ids" eval="[(5, 0, 0),
+            (0, 0, {'view_mode': 'list', 'view_id': ref('view_is_tableau_de_bord_list')}),
+            (0, 0, {'view_mode': 'form', 'view_id': ref('view_is_tableau_de_bord_form')})]"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Créer votre premier tableau de bord !
+            </p>
+            <p>
+                Les tableaux de bord vous permettent d'afficher plusieurs recherches enregistrées sur une même page.
+            </p>
+        </field>
+    </record>
+
+    <!-- Action pour afficher la liste des tableaux de bord disponibles -->
+    <record id="action_is_tableau_de_bord_view" model="ir.actions.act_window">
+        <field name="name">Mes tableaux de bord</field>
+        <field name="res_model">is.tableau.de.bord</field>
+        <field name="view_mode">kanban,list</field>
+        <field name="view_ids" eval="[(5, 0, 0),
+            (0, 0, {'view_mode': 'kanban', 'view_id': ref('view_is_tableau_de_bord_kanban')}),
+            (0, 0, {'view_mode': 'list', 'view_id': ref('view_is_tableau_de_bord_list')})]"/>
+        <field name="domain">[('active', '=', True)]</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Aucun tableau de bord disponible !
+            </p>
+            <p>
+                Créez d'abord vos tableaux de bord dans la section "Configuration".
+            </p>
+        </field>
+    </record>
+
+    <!-- Menu -->
+    <menuitem id="menu_is_tableau_de_bord_root"
+              name="Tableaux de bord"
+              sequence="10"/>
+              
+    <!-- Menu pour visualiser les tableaux de bord -->
+    <menuitem id="menu_is_tableau_de_bord_view"
+              name="Mes tableaux de bord"
+              parent="menu_is_tableau_de_bord_root"
+              action="action_is_tableau_de_bord_view"
+              sequence="10"/>
+
+    <!-- Menu pour la configuration -->
+    <menuitem id="menu_is_tableau_de_bord_config"
+              name="Configuration"
+              parent="menu_is_tableau_de_bord_root"
+              sequence="20"/>
+              
+    <menuitem id="menu_is_tableau_de_bord_manage"
+              name="Gestion des tableaux de bord"
+              parent="menu_is_tableau_de_bord_config"
+              action="action_is_tableau_de_bord_manage"
+              sequence="10"/>
+
+</odoo>

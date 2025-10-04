@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    
+    <!-- Exemple de tableau de bord -->
+    <record id="tableau_de_bord_exemple" model="is.tableau.de.bord">
+        <field name="name">Tableau de bord exemple</field>
+    </record>
+
+</odoo>
