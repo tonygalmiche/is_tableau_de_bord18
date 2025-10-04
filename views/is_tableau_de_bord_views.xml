@@ -74,6 +74,70 @@
         </field>
     </record>
 
+    <!-- Vue formulaire dédiée pour l'édition de ligne depuis le dashboard -->
+    <record id="view_is_tableau_de_bord_line_edit_form" model="ir.ui.view">
+        <field name="name">is.tableau.de.bord.line.edit.form</field>
+        <field name="model">is.tableau.de.bord.line</field>
+        <field name="priority" eval="10"/>
+        <field name="arch" type="xml">
+            <form string="Modification de la ligne du tableau de bord">
+                <sheet>
+                    <group>
+                        <group string="Sélection du filtre">
+                            <field name="model_ids" invisible="1"/>
+                            <field name="model_id" options="{'no_create': True, 'no_open': True}" domain="[('id', 'in', model_ids)]"/>
+                            <field name="user_id" options="{'no_create': True}"/>
+                            <field name="filter_domain" invisible="1"/>
+                            <field name="filter_id" options="{'no_create': True}" domain="filter_domain"/>
+                        </group>
+                        <group string="Affichage">
+                            <field name="name"/>
+                            <field name="sequence"/>
+                            <field name="width"/>
+                            <field name="height"/>
+                        </group>
+                    </group>
+                    <group string="Configuration de l'affichage">
+                        <group>
+                            <field name="display_mode"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Graphique" invisible="display_mode not in ['graph', 'auto']">
+                            <group>
+                                <group>
+                                    <field name="graph_chart_type"/>
+                                </group>
+                                <group>
+                                    <field name="graph_aggregator"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="Tableau croisé (Pivot)" invisible="display_mode not in ['pivot', 'auto']">
+                            <group>
+                                <group>
+                                    <field name="pivot_row_groupby" placeholder="ex: invoice_date:year"/>
+                                    <field name="pivot_col_groupby" placeholder="ex: partner_id"/>
+                                </group>
+                                <group>
+                                    <field name="pivot_measure" placeholder="ex: price_subtotal"/>
+                                </group>
+                            </group>
+                            <div class="alert alert-info" role="alert">
+                                <p><strong>Aide :</strong></p>
+                                <ul>
+                                    <li><strong>Groupe lignes :</strong> Champ pour grouper les lignes (ex: invoice_date:year, partner_id)</li>
+                                    <li><strong>Groupe colonnes :</strong> Champ pour grouper les colonnes (ex: state, user_id)</li>
+                                    <li><strong>Mesure :</strong> Champ numérique à agréger (ex: price_subtotal, amount_total)</li>
+                                </ul>
+                            </div>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
     <!-- Vue liste du tableau de bord -->
     <record id="view_is_tableau_de_bord_list" model="ir.ui.view">
         <field name="name">is.tableau.de.bord.list</field>

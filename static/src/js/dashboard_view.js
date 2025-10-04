@@ -64,9 +64,22 @@ export class DashboardFormController extends FormController {
             html += `
                 <div class="col-md-${isNaN(widthCol) ? 6 : widthCol} mb-3">
                     <div class="card h-100">
-                        <div class="card-header">
-                            <h5 class="card-title mb-0">${line.name || 'Sans nom'}</h5>
-                            <small class="text-muted">ID Filtre: ${filterId || 'Non défini'}</small>
+                        <div class="card-header d-flex justify-content-between align-items-start">
+                            <div>
+                                <h5 class="card-title mb-0">${line.name || 'Sans nom'}</h5>
+                                <small class="text-muted">ID Filtre: ${filterId || 'Non défini'}</small>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <a href="#" class="btn btn-sm btn-outline-primary open-filter-link" data-line-id="${serverLineId}" title="Ouvrir la recherche complète en plein écran">
+                                    <i class="fa fa-expand"></i> Plein écran
+                                </a>
+                                <a href="#" class="btn btn-sm btn-outline-info edit-line-link" data-line-id="${serverLineId}" title="Modifier la ligne du tableau de bord">
+                                    <i class="fa fa-pencil"></i>
+                                </a>
+                                <a href="#" class="btn btn-sm btn-outline-secondary edit-filter-link" data-line-id="${serverLineId}" title="Modifier le filtre">
+                                    <i class="fa fa-search"></i>
+                                </a>
+                            </div>
                         </div>
                         <div class="card-body p-0" style="height: ${isNaN(heightPx) ? 400 : heightPx}px; overflow: auto;">
                             <div id="dashboard_item_${lineRecord.id}" class="dashboard-item h-100 d-flex align-items-center justify-content-center">
@@ -75,18 +88,13 @@ export class DashboardFormController extends FormController {
                                 </div>
                             </div>
                         </div>
-                        <div class="card-footer text-center py-2" style="background-color: #f8f9fa; border-top: 1px solid #dee2e6;">
-                            <a href="#" class="btn btn-sm btn-outline-primary open-filter-link" data-line-id="${serverLineId}" title="Ouvrir la recherche complète en plein écran">
-                                <i class="fa fa-expand"></i> Plein écran
-                            </a>
-                            <a href="#" class="btn btn-sm btn-outline-secondary edit-filter-link ms-2" data-line-id="${serverLineId}" title="Modifier le filtre">
-                                <i class="fa fa-search"></i>
-                            </a>
-                        </div>
                     </div>
                 </div>
             `;
         }
+
+
+
         
         html += '</div>';
     container.innerHTML = html;
@@ -95,6 +103,7 @@ export class DashboardFormController extends FormController {
     // Ajouter les gestionnaires d'événements pour les liens "Ouvrir en plein écran"
     setTimeout(() => {
         this.attachOpenFilterLinks();
+        this.attachEditLineLinks();
         this.attachEditFilterLinks();
     }, 100);
     }
@@ -133,6 +142,25 @@ export class DashboardFormController extends FormController {
                 }
                 
                 await this.editFilter(lineId);
+            });
+        });
+    }
+
+    attachEditLineLinks() {
+        const links = document.querySelectorAll('.edit-line-link');
+        console.log("[TDB] Attaching event listeners to", links.length, "edit line links");
+        
+        links.forEach(link => {
+            link.addEventListener('click', async (e) => {
+                e.preventDefault();
+                const lineId = parseInt(link.dataset.lineId);
+                
+                if (!lineId) {
+                    console.warn("[TDB] Pas de lineId pour ce lien d'édition de ligne");
+                    return;
+                }
+                
+                await this.editLine(lineId);
             });
         });
     }
@@ -182,6 +210,29 @@ export class DashboardFormController extends FormController {
             
         } catch (error) {
             console.error("[TDB] Erreur lors de l'édition du filtre:", error);
+        }
+    }
+
+    async editLine(lineId) {
+        try {
+            console.log("[TDB] Édition de la ligne", lineId);
+            
+            // Ouvrir le formulaire de la ligne en plein écran avec la vue dédiée
+            await this.actionService.doAction({
+                type: 'ir.actions.act_window',
+                name: 'Modifier la ligne du tableau de bord',
+                res_model: 'is.tableau.de.bord.line',
+                res_id: lineId,
+                views: [[false, 'form']],
+                view_mode: 'form',
+                target: 'current',
+                context: {
+                    'form_view_ref': 'is_tableau_de_bord18.view_is_tableau_de_bord_line_edit_form'
+                }
+            });
+            
+        } catch (error) {
+            console.error("[TDB] Erreur lors de l'édition de la ligne:", error);
         }
     }
 
@@ -560,6 +611,12 @@ registry.category("views").add("form", {
             }
         }
         
+        attachEditLineLinks() {
+            if (this.props.context?.dashboard_mode) {
+                return DashboardFormController.prototype.attachEditLineLinks.call(this);
+            }
+        }
+        
         async openFilterFullScreen(lineId) {
             if (this.props.context?.dashboard_mode) {
                 return DashboardFormController.prototype.openFilterFullScreen.call(this, lineId);
@@ -569,6 +626,12 @@ registry.category("views").add("form", {
         async editFilter(lineId) {
             if (this.props.context?.dashboard_mode) {
                 return DashboardFormController.prototype.editFilter.call(this, lineId);
+            }
+        }
+        
+        async editLine(lineId) {
+            if (this.props.context?.dashboard_mode) {
+                return DashboardFormController.prototype.editLine.call(this, lineId);
             }
         }
         
