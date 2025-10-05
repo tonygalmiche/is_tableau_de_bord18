@@ -2,7 +2,7 @@
 
 {
   "name" : "InfoSaône - Tableau de bord pour Odoo 18",
-  "version" : "0.2.0",
+  "version" : "0.3.0",
   "author" : "InfoSaône / Tony Galmiche",
   "category" : "InfoSaône",
   "description": """
@@ -29,6 +29,7 @@ Fonctionnalités :
   ],            
   "data" : [
   'security/ir.model.access.csv',
+  'views/ir_filters_views.xml',
   'views/is_tableau_de_bord_views.xml',
   ],   
    'assets': {
@@ -36,6 +37,7 @@ Fonctionnalités :
             'is_tableau_de_bord18/static/src/css/dashboard.css',
             'web/static/lib/Chart/Chart.js',
             'is_tableau_de_bord18/static/src/js/dashboard_view.js',
+            'is_tableau_de_bord18/static/src/js/custom_favorite_item.js',
         ],
     },
   "installable": True,         
