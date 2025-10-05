@@ -16,7 +16,7 @@
                         <field name="name"/>
                     </group>
                     <group string="Éléments du tableau de bord">
-                        <field name="line_ids">
+                        <field name="line_ids" context="{'form_view_ref': 'is_tableau_de_bord18.view_is_tableau_de_bord_line_edit_form'}">
                             <list>
                                 <field name="sequence" widget="handle"/>
                                 <button name="action_open_filter" type="object" icon="fa-eye"    title="Ouvrir en plein écran" invisible="not filter_id"/>
@@ -35,38 +35,6 @@
                                 <field name="pivot_col_groupby" optional="hide"/>
                                 <field name="pivot_measure" optional="hide"/>
                             </list>
-                            <form>
-                                <sheet>
-                                    <group>
-                                        <group>
-                                            <field name="model_ids" invisible="1"/>
-                                            <field name="model_id" options="{'no_create': True, 'no_open': True}" domain="[('id', 'in', model_ids)]"/>
-                                            <field name="user_id" options="{'no_create': True}"/>
-                                            <field name="filter_domain" invisible="1"/>
-                                            <field name="filter_id" options="{'no_create': True}" domain="filter_domain"/>
-                                        </group>
-                                        <group>
-                                            <field name="name"/>
-                                            <field name="width"/>
-                                            <field name="height"/>
-                                        </group>
-                                    </group>
-                                    <group string="Configuration">
-                                        <group>
-                                            <field name="display_mode"/>
-                                        </group>
-                                        <group invisible="display_mode not in ['graph']">
-                                            <field name="graph_chart_type"/>
-                                            <field name="graph_aggregator"/>
-                                        </group>
-                                        <group invisible="display_mode not in ['pivot']">
-                                            <field name="pivot_row_groupby"/>
-                                            <field name="pivot_col_groupby"/>
-                                            <field name="pivot_measure"/>
-                                        </group>
-                                    </group>
-                                </sheet>
-                            </form>
                         </field>
                     </group>
                 </sheet>
@@ -84,7 +52,7 @@
                 <sheet>
                     <group>
                         <group string="Sélection du filtre">
-                            <field name="model_ids" invisible="1"/>
+                            <field name="model_ids" widget="many2many_tags" invisible="1"/>
                             <field name="model_id" options="{'no_create': True, 'no_open': True}" domain="[('id', 'in', model_ids)]"/>
                             <field name="user_id" options="{'no_create': True}"/>
                             <field name="filter_domain" invisible="1"/>
@@ -98,39 +66,30 @@
                         </group>
                     </group>
                     <group string="Configuration de l'affichage">
-                        <group>
-                            <field name="display_mode"/>
-                        </group>
+                        <field name="display_mode"/>
                     </group>
-                    <notebook>
-                        <page string="Graphique" invisible="display_mode not in ['graph', 'auto']">
+                    <notebook invisible="display_mode not in ['graph', 'pivot', 'list']">
+                        <page string="Configuration Graphique" invisible="display_mode != 'graph'">
                             <group>
-                                <group>
-                                    <field name="graph_chart_type"/>
-                                </group>
-                                <group>
-                                    <field name="graph_aggregator"/>
-                                </group>
+                                <field name="graph_chart_type"/>
+                                <field name="graph_aggregator"/>
                             </group>
                         </page>
-                        <page string="Tableau croisé (Pivot)" invisible="display_mode not in ['pivot', 'auto']">
+                        <page string="Configuration Pivot" invisible="display_mode != 'pivot'">
                             <group>
-                                <group>
-                                    <field name="pivot_row_groupby" placeholder="ex: invoice_date:year"/>
-                                    <field name="pivot_col_groupby" placeholder="ex: partner_id"/>
-                                </group>
-                                <group>
-                                    <field name="pivot_measure" placeholder="ex: price_subtotal"/>
-                                </group>
+                                <field name="pivot_row_groupby" placeholder="ex: invoice_date:year"/>
+                                <field name="pivot_col_groupby" placeholder="ex: partner_id"/>
+                                <field name="pivot_measure" placeholder="ex: price_subtotal"/>
                             </group>
-                            <div class="alert alert-info" role="alert">
-                                <p><strong>Aide :</strong></p>
-                                <ul>
-                                    <li><strong>Groupe lignes :</strong> Champ pour grouper les lignes (ex: invoice_date:year, partner_id)</li>
-                                    <li><strong>Groupe colonnes :</strong> Champ pour grouper les colonnes (ex: state, user_id)</li>
-                                    <li><strong>Mesure :</strong> Champ numérique à agréger (ex: price_subtotal, amount_total)</li>
-                                </ul>
-                            </div>
+                        </page>
+                        <page string="Champs de la liste" invisible="display_mode != 'list'">
+                            <field name="field_ids">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="field_name"/>
+                                    <field name="visible" widget="boolean_toggle"/>
+                                </list>
+                            </field>
                         </page>
                     </notebook>
                 </sheet>

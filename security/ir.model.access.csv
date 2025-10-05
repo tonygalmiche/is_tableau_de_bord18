@@ -1,3 +1,4 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_is_tableau_de_bord_user,access_is_tableau_de_bord_user,model_is_tableau_de_bord,base.group_user,1,1,1,1
 access_is_tableau_de_bord_line_user,access_is_tableau_de_bord_line_user,model_is_tableau_de_bord_line,base.group_user,1,1,1,1
+access_is_tableau_de_bord_line_field_user,access_is_tableau_de_bord_line_field_user,model_is_tableau_de_bord_line_field,base.group_user,1,1,1,1

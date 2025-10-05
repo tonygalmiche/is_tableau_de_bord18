@@ -47,6 +47,10 @@ class TableauDeBordController(http.Controller):
             # Fusionner avec le contexte actuel
             ctx = dict(request.env.context)
             ctx.update(context)
+            
+            # Ajouter le line_id au contexte pour qu'il soit accessible dans _get_list_data
+            if line_id:
+                ctx['line_id'] = line_id
 
             # Appliquer overrides éventuels de la ligne (sur ctx)
             if line_id:
@@ -122,9 +126,42 @@ class TableauDeBordController(http.Controller):
 
     def _get_list_data(self, model, filter_obj, domain, context):
         """Génère les données pour une vue liste"""
-        # 1) Champs explicitement définis dans le favori (list_fields)
+        # 1) Priorité 1: Champs configurés dans la ligne du tableau de bord (field_ids)
+        line_id = context.get('line_id')
         explicit_fields = []
-        if context.get('list_fields'):
+        field_labels = {}
+        
+        if line_id:
+            try:
+                line = request.env['is.tableau.de.bord.line'].browse(int(line_id))
+                if line and line.exists() and line.field_ids:
+                    # Récupérer uniquement les champs visibles
+                    visible_fields = line.field_ids.filtered(lambda f: f.visible).sorted('sequence')
+                    _logger.info("[TDB] Found %s visible fields in line configuration", len(visible_fields))
+                    
+                    # Pour chaque champ configuré, on doit retrouver le nom technique depuis le label
+                    fields_get = model.fields_get()
+                    label_to_name = {v.get('string', ''): k for k, v in fields_get.items()}
+                    
+                    for field_config in visible_fields:
+                        field_label = field_config.field_name
+                        # Chercher le nom technique du champ qui correspond à ce label
+                        field_name = label_to_name.get(field_label)
+                        if field_name and field_name in model._fields:
+                            explicit_fields.append(field_name)
+                            field_labels[field_name] = field_label
+                        else:
+                            # Si pas trouvé par label, peut-être que c'est déjà un nom technique
+                            if field_label in model._fields:
+                                explicit_fields.append(field_label)
+                                field_labels[field_label] = fields_get.get(field_label, {}).get('string', field_label)
+                    
+                    _logger.info("[TDB] Mapped fields from line config: %s", explicit_fields)
+            except Exception as e:
+                _logger.exception("[TDB] Error loading field_ids from line: %s", e)
+        
+        # 2) Champs explicitement définis dans le favori (list_fields)
+        if not explicit_fields and context.get('list_fields'):
             lf = context.get('list_fields')
             if isinstance(lf, str):
                 # accepter "a,b,c"
@@ -133,6 +170,9 @@ class TableauDeBordController(http.Controller):
                 explicit_fields = [str(f).strip() for f in lf if str(f).strip()]
             # ne garder que les champs existants
             explicit_fields = [f for f in explicit_fields if f in model._fields]
+            if explicit_fields:
+                fields_def = model.fields_get(explicit_fields)
+                field_labels = {f: fields_def.get(f, {}).get('string', f) for f in explicit_fields}
 
         view_id = None
         xmlid = context.get('tree_view_ref') or context.get('list_view_ref')
@@ -144,9 +184,10 @@ class TableauDeBordController(http.Controller):
 
         if explicit_fields:
             # libellés depuis fields_get
-            fields_def = model.fields_get(explicit_fields)
+            if not field_labels:
+                fields_def = model.fields_get(explicit_fields)
+                field_labels = {f: fields_def.get(f, {}).get('string', f) for f in explicit_fields}
             fields_to_display = explicit_fields
-            field_labels = {f: fields_def.get(f, {}).get('string', f) for f in explicit_fields}
         else:
             fields_to_display, field_labels = self._get_fields_from_view(model, 'list', view_id=view_id)
         _logger.info("[TDB] list fields=%s (view_id=%s)", fields_to_display, view_id)
