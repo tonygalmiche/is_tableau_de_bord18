@@ -19,4 +19,16 @@
         <field name="implied_ids" eval="[(4, ref('group_tableau_de_bord_user'))]"/>
         <field name="comment">Les gestionnaires peuvent créer et modifier les tableaux de bord</field>
     </record>
+
+    <!-- Règle de sécurité pour permettre l'accès à tous les filtres utilisateur -->
+    <record id="ir_filters_tableau_de_bord_rule" model="ir.rule">
+        <field name="name">Tableau de bord: accès à tous les filtres utilisateur</field>
+        <field name="model_id" ref="base.model_ir_filters"/>
+        <field name="domain_force">[('user_id', '!=', False)]</field>
+        <field name="groups" eval="[(4, ref('group_tableau_de_bord_user'))]"/>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
 </odoo>

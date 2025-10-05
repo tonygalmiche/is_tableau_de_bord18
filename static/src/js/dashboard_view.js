@@ -67,7 +67,6 @@ export class DashboardFormController extends FormController {
                         <div class="card-header d-flex justify-content-between align-items-start">
                             <div>
                                 <h5 class="card-title mb-0">${line.name || 'Sans nom'}</h5>
-                                <small class="text-muted">ID Filtre: ${filterId || 'Non défini'}</small>
                             </div>
                             <div class="d-flex gap-2">
                                 <a href="#" class="btn btn-sm btn-outline-primary open-filter-link" data-line-id="${serverLineId}" title="Ouvrir la recherche complète en plein écran">
