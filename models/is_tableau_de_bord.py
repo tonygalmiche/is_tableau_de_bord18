@@ -9,6 +9,7 @@ class IsTableauDeBord(models.Model):
     _order = 'name'
 
     name = fields.Char('Nom du tableau de bord', required=True)
+    description = fields.Text('Description')
     line_ids = fields.One2many('is.tableau.de.bord.line', 'tableau_id', copy=True, string='Lignes du tableau de bord')
     active = fields.Boolean('Actif', default=True)
 

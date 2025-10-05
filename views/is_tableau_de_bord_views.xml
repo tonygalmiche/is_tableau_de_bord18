@@ -14,6 +14,7 @@
                 <sheet>
                     <group>
                         <field name="name"/>
+                        <field name="description" widget="text"/>
                     </group>
                     <group string="Éléments du tableau de bord">
                         <field name="line_ids" context="{'form_view_ref': 'is_tableau_de_bord18.view_is_tableau_de_bord_line_edit_form'}">
@@ -115,33 +116,26 @@
         <field name="model">is.tableau.de.bord</field>
         <field name="arch" type="xml">
             <kanban string="Tableaux de bord" class="o_kanban_dashboard">
+                <field name="id"/>
                 <field name="name"/>
+                <field name="description"/>
                 <templates>
                     <t t-name="kanban-box">
-                        <div class="oe_kanban_card oe_kanban_global_click" style="min-height: 150px;">
-                            <div class="o_kanban_card_header">
-                                <div class="o_kanban_card_header_title">
-                                    <div class="o_primary"><strong><field name="name"/></strong></div>
+                        <div class="oe_kanban_card oe_kanban_global_click">
+                            <div class="oe_kanban_content">
+                                <div class="o_kanban_record_top bg-light text-center p-3 mb-3">
+                                    <h3 class="mb-0 text-center"><field name="name" class="text-center"/></h3>
                                 </div>
-                                <div class="o_kanban_manage_button_section">
-                                    <a class="o_kanban_manage_toggle_button" href="#">
-                                        <i class="fa fa-ellipsis-v" role="img" aria-label="Gérer" title="Gérer"/>
-                                    </a>
-                                </div>
-                            </div>
-                            <div class="container o_kanban_card_content">
-                                <div class="row">
-                                    <div class="col-12 text-center">
-                                        <button type="object" name="action_view_dashboard" class="btn btn-primary">
+                                <div class="o_kanban_record_body">
+                                    <div class="text-center">
+                                        <button type="object" name="action_view_dashboard" class="btn btn-primary oe_kanban_action">
                                             <i class="fa fa-eye"/> Voir le tableau de bord
                                         </button>
                                     </div>
                                 </div>
-                            </div>
-                            <div class="o_kanban_card_manage_pane dropdown-menu" role="menu">
-                                <a role="menuitem" type="object" name="action_view_dashboard" class="dropdown-item">Voir le tableau de bord</a>
-                                <a role="menuitem" type="edit" class="dropdown-item">Modifier</a>
-                                <a role="menuitem" type="delete" class="dropdown-item">Supprimer</a>
+                                <div class="mb-3">
+                                    <field name="description" widget="text"/>
+                                </div>
                             </div>
                         </div>
                     </t>
@@ -199,7 +193,7 @@
 
     <!-- Actions -->
     <!-- Action pour la gestion des tableaux de bord -->
-    <record id="action_is_tableau_de_bord_manage" model="ir.actions.act_window">
+    <!-- <record id="action_is_tableau_de_bord_manage" model="ir.actions.act_window">
         <field name="name">Gestion des tableaux de bord</field>
         <field name="res_model">is.tableau.de.bord</field>
         <field name="view_mode">list,form</field>
@@ -214,16 +208,17 @@
                 Les tableaux de bord vous permettent d'afficher plusieurs recherches enregistrées sur une même page.
             </p>
         </field>
-    </record>
+    </record> -->
 
     <!-- Action pour afficher la liste des tableaux de bord disponibles -->
     <record id="action_is_tableau_de_bord_view" model="ir.actions.act_window">
         <field name="name">Mes tableaux de bord</field>
         <field name="res_model">is.tableau.de.bord</field>
-        <field name="view_mode">kanban,list</field>
+        <field name="view_mode">kanban,list,form</field>
         <field name="view_ids" eval="[(5, 0, 0),
             (0, 0, {'view_mode': 'kanban', 'view_id': ref('view_is_tableau_de_bord_kanban')}),
-            (0, 0, {'view_mode': 'list', 'view_id': ref('view_is_tableau_de_bord_list')})]"/>
+            (0, 0, {'view_mode': 'list', 'view_id': ref('view_is_tableau_de_bord_list')}),
+            (0, 0, {'view_mode': 'form', 'view_id': ref('view_is_tableau_de_bord_form')})]"/>
         <field name="domain">[('active', '=', True)]</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
@@ -236,19 +231,18 @@
     </record>
 
     <!-- Menu -->
-    <menuitem id="menu_is_tableau_de_bord_root"
+    <!-- <menuitem id="menu_is_tableau_de_bord_root"
               name="Tableaux de bord"
-              sequence="10"/>
+              sequence="10"/> -->
               
     <!-- Menu pour visualiser les tableaux de bord -->
-    <menuitem id="menu_is_tableau_de_bord_view"
-              name="Mes tableaux de bord"
-              parent="menu_is_tableau_de_bord_root"
+    <menuitem id="menu_is_tableau_de_bord_root"
+              name="Tableaux de bord"
               action="action_is_tableau_de_bord_view"
-              sequence="10"/>
+              sequence="499"/>
 
     <!-- Menu pour la configuration -->
-    <menuitem id="menu_is_tableau_de_bord_config"
+    <!-- <menuitem id="menu_is_tableau_de_bord_config"
               name="Configuration"
               parent="menu_is_tableau_de_bord_root"
               sequence="20"/>
@@ -257,6 +251,6 @@
               name="Gestion des tableaux de bord"
               parent="menu_is_tableau_de_bord_config"
               action="action_is_tableau_de_bord_manage"
-              sequence="10"/>
+              sequence="10"/> -->
 
 </odoo>
