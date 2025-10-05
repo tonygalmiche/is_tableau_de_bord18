@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    
+    <!-- Héritage de la vue formulaire ir.filters pour ajouter les champs menu_id, view_id et view_type -->
+    <record id="view_ir_filters_form_inherit" model="ir.ui.view">
+        <field name="name">ir.filters.form.inherit.tableau.de.bord</field>
+        <field name="model">ir.filters</field>
+        <field name="inherit_id" ref="base.ir_filters_view_form"/>
+        <field name="arch" type="xml">
+            <!-- Ajouter les nouveaux champs après le champ model_id -->
+            <field name="model_id" position="after">
+                <field name="is_menu_id" options="{'no_create': True, 'no_open': True}"/>
+                <field name="is_view_id" options="{'no_create': True, 'no_open': True}"/>
+                <field name="is_view_type"/>
+            </field>
+        </field>
+    </record>
+
+    <!-- Héritage de la vue liste ir.filters pour afficher les nouveaux champs -->
+    <record id="view_ir_filters_tree_inherit" model="ir.ui.view">
+        <field name="name">ir.filters.tree.inherit.tableau.de.bord</field>
+        <field name="model">ir.filters</field>
+        <field name="inherit_id" ref="base.ir_filters_view_tree"/>
+        <field name="arch" type="xml">
+            <!-- Ajouter les colonnes pour menu et vue -->
+            <field name="model_id" position="after">
+                <field name="is_menu_id" optional="hide"/>
+                <field name="is_view_type" optional="hide"/>
+            </field>
+        </field>
+    </record>
+
+</odoo>
