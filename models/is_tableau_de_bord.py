@@ -82,11 +82,10 @@ class IsTableauDeBordLine(models.Model):
 
     # Overrides d'affichage (facultatifs)
     display_mode = fields.Selection([
-        ('auto', 'Auto (depuis le favori)'),
         ('list', 'Liste'),
         ('graph', 'Graphique'),
         ('pivot', 'Tableau croisé'),
-    ], string='Mode d\'affichage', default='auto')
+    ], string='Mode d\'affichage', default='graph')
 
     graph_chart_type = fields.Selection([
         ('bar', 'Barres'),
@@ -175,6 +174,12 @@ class IsTableauDeBordLine(models.Model):
             if not self.user_id and self.filter_id.user_id:
                 self.user_id = self.filter_id.user_id
             
+            # Récupérer le display_mode depuis le filtre si renseigné
+            if self.filter_id.is_view_type:
+                view_type = self.filter_id.is_view_type
+                if view_type:
+                    self.display_mode = view_type
+              
             # Charger les champs de la vue si display_mode est 'list'
             if self.display_mode == 'list':
                 self._load_list_fields()
@@ -188,10 +193,7 @@ class IsTableauDeBordLine(models.Model):
     def _load_list_fields(self):
         """Charge les champs de la vue liste par défaut ou depuis le filtre"""
         if not self.filter_id or not self.model_id:
-            print(">>> _load_list_fields: Pas de filter_id ou model_id")
             return
-        
-        print(f">>> _load_list_fields: filter_id={self.filter_id.name}, model={self.filter_id.model_id}")
         
         # Supprimer les champs existants
         self.field_ids = [(5, 0, 0)]
@@ -203,7 +205,6 @@ class IsTableauDeBordLine(models.Model):
         # Si le filtre a une vue spécifique (is_view_id), on utilise cette vue
         if hasattr(self.filter_id, 'is_view_id') and self.filter_id.is_view_id:
             view = self.filter_id.is_view_id
-            print(f">>> Vue depuis filtre: id={view.id}, name={view.name}, type={view.type}, model={view.model}")
             if view.type in ('tree', 'list'):
                 # Parser l'arch pour extraire les champs
                 import lxml.etree as etree
@@ -211,18 +212,11 @@ class IsTableauDeBordLine(models.Model):
                     arch = etree.fromstring(view.arch)
                     field_elements = arch.xpath('//field[@name]')
                     field_names = [f.get('name') for f in field_elements if f.get('name')]
-                    print(f">>> Champs extraits de la vue filtre: {field_names}")
                 except Exception as e:
-                    print(f">>> Erreur parsing XML vue filtre: {e}")
                     field_names = []
-            else:
-                print(f">>> Vue filtre n'est pas de type 'tree/list' mais '{view.type}'")
-        else:
-            print(">>> Pas de is_view_id dans le filtre")
         
         # Si pas de vue spécifique ou pas de champs trouvés, utiliser la vue par défaut du modèle
         if not field_names:
-            print(f">>> Recherche vue par défaut pour modèle: {self.filter_id.model_id}")
             # Récupérer la vue liste par défaut
             view = self.env['ir.ui.view'].search([
                 ('model', '=', self.filter_id.model_id),
@@ -230,23 +224,16 @@ class IsTableauDeBordLine(models.Model):
             ], limit=1, order='priority,id')
             
             if view:
-                print(f">>> Vue par défaut trouvée: id={view.id}, name={view.name}, priority={view.priority}")
                 import lxml.etree as etree
                 try:
                     arch = etree.fromstring(view.arch)
-                    print(f">>> Arch XML: {view.arch[:200]}...")
                     field_elements = arch.xpath('//field[@name]')
                     field_names = [f.get('name') for f in field_elements if f.get('name')]
-                    print(f">>> Champs extraits de la vue par défaut: {field_names}")
                 except Exception as e:
-                    print(f">>> Erreur parsing XML vue par défaut: {e}")
                     field_names = []
-            else:
-                print(">>> Aucune vue 'tree' ou 'list' trouvée pour ce modèle")
         
         # Si toujours pas de champs, utiliser les champs de base du modèle
         if not field_names:
-            print(">>> Fallback: utilisation des champs du modèle")
             # Récupérer quelques champs du modèle
             model = self.env[self.filter_id.model_id]
             field_names = []
@@ -255,11 +242,9 @@ class IsTableauDeBordLine(models.Model):
                     field_names.append(fname)
                 if len(field_names) >= 10:  # Limiter à 10 champs
                     break
-            print(f">>> Champs du modèle (limité à 10): {field_names}")
         
         # Récupérer le modèle pour obtenir les labels des champs
         model = self.env[self.filter_id.model_id]
-        print(f">>> Modèle pour labels: {model}")
         
         # Créer les lignes de champs avec leur label
         sequence = 10
@@ -268,9 +253,6 @@ class IsTableauDeBordLine(models.Model):
             field_label = fname
             if fname in model._fields:
                 field_label = model._fields[fname].string or fname
-                print(f">>> Champ: {fname} -> Label: {field_label}")
-            else:
-                print(f">>> Champ {fname} non trouvé dans model._fields")
             
             self.field_ids = [(0, 0, {
                 'field_name': field_label,
@@ -278,8 +260,6 @@ class IsTableauDeBordLine(models.Model):
                 'sequence': sequence,
             })]
             sequence += 10
-        
-        print(f">>> Total champs créés: {len(field_names)}")
 
 
     def action_open_filter(self):

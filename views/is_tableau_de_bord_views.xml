@@ -230,27 +230,10 @@
         </field>
     </record>
 
-    <!-- Menu -->
-    <!-- <menuitem id="menu_is_tableau_de_bord_root"
-              name="Tableaux de bord"
-              sequence="10"/> -->
-              
+
     <!-- Menu pour visualiser les tableaux de bord -->
     <menuitem id="menu_is_tableau_de_bord_root"
               name="Tableaux de bord"
               action="action_is_tableau_de_bord_view"
               sequence="499"/>
-
-    <!-- Menu pour la configuration -->
-    <!-- <menuitem id="menu_is_tableau_de_bord_config"
-              name="Configuration"
-              parent="menu_is_tableau_de_bord_root"
-              sequence="20"/>
-              
-    <menuitem id="menu_is_tableau_de_bord_manage"
-              name="Gestion des tableaux de bord"
-              parent="menu_is_tableau_de_bord_config"
-              action="action_is_tableau_de_bord_manage"
-              sequence="10"/> -->
-
 </odoo>
