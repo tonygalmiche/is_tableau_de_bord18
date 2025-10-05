@@ -100,6 +100,9 @@ class IsTableauDeBordLine(models.Model):
         ('max', 'Maximum'),
         ('count', 'Compte'),
     ], string='Agrégateur', default='sum')
+    
+    graph_measure = fields.Char('Graph: Mesure', help='Champ utilisé pour la mesure du graphique')
+    graph_groupbys = fields.Char('Graph: Groupements', help='Liste des groupements pour le graphique (ex: invoice_date:year)')
 
     pivot_row_groupby = fields.Char('Pivot: Groupe lignes')
     pivot_col_groupby = fields.Char('Pivot: Groupe colonnes')
@@ -112,7 +115,6 @@ class IsTableauDeBordLine(models.Model):
     @api.depends('tableau_id')
     def _compute_model_ids(self):
         """Calcule la liste des IDs des modèles ayant au moins un filtre utilisateur"""
-        # Récupérer tous les filtres
         filters = self.env['ir.filters'].search([])
         
         # Extraire les noms de modèles uniques
@@ -148,9 +150,8 @@ class IsTableauDeBordLine(models.Model):
     def _onchange_model_user(self):
         """Réinitialiser le filtre si le modèle ou l'utilisateur change"""
 
-
-        self.name = self.model_id.name
-
+        if self.model_id:
+            self.name = self.model_id.name
 
         if self.filter_id:
             # Vérifier si le filtre actuel est compatible
@@ -179,6 +180,73 @@ class IsTableauDeBordLine(models.Model):
                 view_type = self.filter_id.is_view_type
                 if view_type:
                     self.display_mode = view_type
+                    print(f">>> Display mode depuis filtre: {self.display_mode}")
+            
+            # Extraire les informations du contexte pour les graphiques
+            if self.filter_id.context:
+                print(f">>> Contexte brut du filtre: {self.filter_id.context}")
+                try:
+                    import ast
+                    context = ast.literal_eval(self.filter_id.context) if isinstance(self.filter_id.context, str) else self.filter_id.context
+                    print(f">>> Contexte parsé: {context}")
+                    
+                    # Pour les graphiques
+                    if self.display_mode == 'graph' and isinstance(context, dict):
+                        print(f">>> Traitement contexte graphique")
+                        # Récupérer graph_mode (bar, line, pie)
+                        if 'graph_mode' in context:
+                            graph_mode = context['graph_mode']
+                            self.graph_chart_type = graph_mode if graph_mode in ['bar', 'line', 'pie'] else 'bar'
+                            print(f">>> graph_mode: {graph_mode} -> graph_chart_type: {self.graph_chart_type}")
+                        
+                        # Récupérer graph_measure
+                        if 'graph_measure' in context:
+                            self.graph_measure = context['graph_measure']
+                            print(f">>> graph_measure: {self.graph_measure}")
+                        
+                        # Récupérer graph_groupbys (liste)
+                        if 'graph_groupbys' in context:
+                            groupbys = context['graph_groupbys']
+                            print(f">>> graph_groupbys (brut): {groupbys}, type: {type(groupbys)}")
+                            if isinstance(groupbys, list):
+                                self.graph_groupbys = ','.join(groupbys)
+                            else:
+                                self.graph_groupbys = str(groupbys)
+                            print(f">>> graph_groupbys (stocké): {self.graph_groupbys}")
+                    
+                    # Pour les pivots
+                    elif self.display_mode == 'pivot' and isinstance(context, dict):
+                        print(f">>> Traitement contexte pivot")
+                        # Récupérer pivot_measures
+                        if 'pivot_measures' in context:
+                            measures = context['pivot_measures']
+                            if isinstance(measures, list) and measures:
+                                self.pivot_measure = measures[0]
+                            else:
+                                self.pivot_measure = str(measures)
+                            print(f">>> pivot_measures: {self.pivot_measure}")
+                        
+                        # Récupérer pivot_row_groupby
+                        if 'pivot_row_groupby' in context:
+                            row_groupby = context['pivot_row_groupby']
+                            if isinstance(row_groupby, list):
+                                self.pivot_row_groupby = ','.join(row_groupby)
+                            else:
+                                self.pivot_row_groupby = str(row_groupby)
+                            print(f">>> pivot_row_groupby: {self.pivot_row_groupby}")
+                        
+                        # Récupérer pivot_col_groupby
+                        if 'pivot_col_groupby' in context:
+                            col_groupby = context['pivot_col_groupby']
+                            if isinstance(col_groupby, list):
+                                self.pivot_col_groupby = ','.join(col_groupby)
+                            else:
+                                self.pivot_col_groupby = str(col_groupby)
+                            print(f">>> pivot_col_groupby: {self.pivot_col_groupby}")
+                
+                except Exception as e:
+                    print(f">>> Erreur parsing contexte: {e}")
+                    pass  # En cas d'erreur de parsing, on ignore
               
             # Charger les champs de la vue si display_mode est 'list'
             if self.display_mode == 'list':
@@ -187,6 +255,13 @@ class IsTableauDeBordLine(models.Model):
     @api.onchange('display_mode')
     def _onchange_display_mode(self):
         """Charger les champs de la liste lorsque display_mode = 'list'"""
+
+        self.graph_chart_type=False
+        if self.display_mode == 'graph':
+            self.graph_chart_type='bar'
+
+
+
         if self.display_mode == 'list' and self.filter_id:
             self._load_list_fields()
 
@@ -268,24 +343,43 @@ class IsTableauDeBordLine(models.Model):
         if not self.filter_id:
             return
         
-        # Récupérer les informations du filtre
-        filter_rec = self.filter_id
-        
         # Préparer le contexte
         context = {}
-        if filter_rec.context:
+        if self.filter_id.context:
             try:
                 import ast
-                context = ast.literal_eval(filter_rec.context) if isinstance(filter_rec.context, str) else filter_rec.context
-            except:
+                # Remplacer null par None pour que ast.literal_eval fonctionne
+                context_str = self.filter_id.context.replace('null', 'None').replace('true', 'True').replace('false', 'False')
+                context = ast.literal_eval(context_str) if isinstance(context_str, str) else self.filter_id.context
+            except Exception as e:
+                print(f">>> Erreur parsing contexte dans action_open_filter: {e}")
                 context = {}
+        
+        # Ajouter/Surcharger avec les informations de la ligne si définies
+        if self.graph_measure:
+            context['graph_measure'] = self.graph_measure
+        if self.graph_groupbys:
+            # Convertir la chaîne en liste
+            context['graph_groupbys'] = [g.strip() for g in self.graph_groupbys.split(',')]
+        if self.graph_chart_type:
+            context['graph_mode'] = self.graph_chart_type
+        if self.graph_aggregator:
+            context['graph_aggregator'] = self.graph_aggregator
+        if self.pivot_measure:
+            context['pivot_measures'] = [self.pivot_measure]
+        if self.pivot_row_groupby:
+            context['pivot_row_groupby'] = [g.strip() for g in self.pivot_row_groupby.split(',')]
+        if self.pivot_col_groupby:
+            context['pivot_col_groupby'] = [g.strip() for g in self.pivot_col_groupby.split(',')]
+        
+        print(f">>> action_open_filter - Contexte final: {context}")
         
         # Préparer le domaine
         domain = []
-        if filter_rec.domain:
+        if self.filter_id.domain:
             try:
                 import ast
-                domain = ast.literal_eval(filter_rec.domain) if isinstance(filter_rec.domain, str) else filter_rec.domain
+                domain = ast.literal_eval(self.filter_id.domain) if isinstance(self.filter_id.domain, str) else self.filter_id.domain
             except:
                 domain = []
         
@@ -307,8 +401,8 @@ class IsTableauDeBordLine(models.Model):
         # Ouvrir l'action
         return {
             'type': 'ir.actions.act_window',
-            'name': filter_rec.name,
-            'res_model': filter_rec.model_id,
+            'name': self.filter_id.name,
+            'res_model': self.filter_id.model_id,
             'views': views,
             'view_mode': view_mode,
             'domain': domain,

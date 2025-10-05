@@ -41,7 +41,9 @@ class IrFilters(models.Model):
             try:
                 # Parser le contexte (peut être une chaîne JSON ou un dict)
                 if isinstance(vals['context'], str):
-                    context_dict = json.loads(vals['context']) if vals['context'] else {}
+                    # Remplacer les valeurs JavaScript par des valeurs Python avant de parser
+                    context_str = vals['context'].replace('null', 'None').replace('true', 'True').replace('false', 'False')
+                    context_dict = json.loads(context_str) if context_str else {}
                 else:
                     context_dict = vals['context']
                 
@@ -58,8 +60,14 @@ class IrFilters(models.Model):
                     vals['is_view_type'] = context_dict['view_type']
                     del context_dict['view_type']
                 
-                # Remettre le contexte nettoyé
-                vals['context'] = json.dumps(context_dict) if context_dict else '{}'
+                # Nettoyer les valeurs None (Python) pour les remplacer par False ou supprimer
+                cleaned_context = {}
+                for key, value in context_dict.items():
+                    if value is not None:
+                        cleaned_context[key] = value
+                
+                # Remettre le contexte nettoyé au format JSON valide
+                vals['context'] = json.dumps(cleaned_context) if cleaned_context else '{}'
                 
             except (json.JSONDecodeError, TypeError, KeyError) as e:
                 # En cas d'erreur, on continue sans bloquer

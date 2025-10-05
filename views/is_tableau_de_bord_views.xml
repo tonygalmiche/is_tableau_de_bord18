@@ -69,30 +69,23 @@
                     <group string="Configuration de l'affichage">
                         <field name="display_mode"/>
                     </group>
-                    <notebook invisible="display_mode not in ['graph', 'pivot', 'list']">
-                        <page string="Configuration Graphique" invisible="display_mode != 'graph'">
-                            <group>
-                                <field name="graph_chart_type"/>
-                                <field name="graph_aggregator"/>
-                            </group>
-                        </page>
-                        <page string="Configuration Pivot" invisible="display_mode != 'pivot'">
-                            <group>
-                                <field name="pivot_row_groupby" placeholder="ex: invoice_date:year"/>
-                                <field name="pivot_col_groupby" placeholder="ex: partner_id"/>
-                                <field name="pivot_measure" placeholder="ex: price_subtotal"/>
-                            </group>
-                        </page>
-                        <page string="Champs de la liste" invisible="display_mode != 'list'">
-                            <field name="field_ids">
-                                <list editable="bottom">
-                                    <field name="sequence" widget="handle"/>
-                                    <field name="field_name"/>
-                                    <field name="visible" widget="boolean_toggle"/>
-                                </list>
-                            </field>
-                        </page>
-                    </notebook>
+                    <group invisible="display_mode != 'graph'">
+                        <field name="graph_chart_type"/>
+                    </group>
+                    <!-- <group invisible="display_mode != 'pivot'">
+                        <field name="pivot_row_groupby" placeholder="ex: invoice_date:year"/>
+                        <field name="pivot_col_groupby" placeholder="ex: partner_id"/>
+                        <field name="pivot_measure" placeholder="ex: price_subtotal"/>
+                    </group> -->
+                    <group invisible="display_mode != 'list'">
+                        <field name="field_ids">
+                            <list editable="bottom">
+                                <field name="sequence" widget="handle"/>
+                                <field name="field_name"/>
+                                <field name="visible" widget="boolean_toggle"/>
+                            </list>
+                        </field>
+                    </group>
                 </sheet>
             </form>
         </field>
@@ -157,11 +150,6 @@
                             <i class="fa fa-pencil"/>
                         </button>
                         <h2 class="mb-0"><field name="name" readonly="1"/></h2>
-                        <div class="btn-group">
-                            <!-- <button string="" type="object" name="action_back_to_list" class="btn btn-sm btn-light" title="Retour à la liste">
-                                <i class="fa fa-arrow-left"/>
-                            </button> -->
-                        </div>
                     </div>
                     <div id="dashboard_container" class="container-fluid">
                         <!-- Les éléments seront générés dynamiquement par JavaScript -->
@@ -190,25 +178,6 @@
             </form>
         </field>
     </record>
-
-    <!-- Actions -->
-    <!-- Action pour la gestion des tableaux de bord -->
-    <!-- <record id="action_is_tableau_de_bord_manage" model="ir.actions.act_window">
-        <field name="name">Gestion des tableaux de bord</field>
-        <field name="res_model">is.tableau.de.bord</field>
-        <field name="view_mode">list,form</field>
-        <field name="view_ids" eval="[(5, 0, 0),
-            (0, 0, {'view_mode': 'list', 'view_id': ref('view_is_tableau_de_bord_list')}),
-            (0, 0, {'view_mode': 'form', 'view_id': ref('view_is_tableau_de_bord_form')})]"/>
-        <field name="help" type="html">
-            <p class="o_view_nocontent_smiling_face">
-                Créer votre premier tableau de bord !
-            </p>
-            <p>
-                Les tableaux de bord vous permettent d'afficher plusieurs recherches enregistrées sur une même page.
-            </p>
-        </field>
-    </record> -->
 
     <!-- Action pour afficher la liste des tableaux de bord disponibles -->
     <record id="action_is_tableau_de_bord_view" model="ir.actions.act_window">

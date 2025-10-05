@@ -28,6 +28,7 @@ Fonctionnalités :
     'data/demo_data.xml',
   ],            
   "data" : [
+  'security/is_tableau_de_bord_security.xml',
   'security/ir.model.access.csv',
   'views/ir_filters_views.xml',
   'views/is_tableau_de_bord_views.xml',

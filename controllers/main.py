@@ -40,37 +40,51 @@ class TableauDeBordController(http.Controller):
             context = {}
             if filter_obj.context:
                 try:
-                    context = ast.literal_eval(filter_obj.context)
-                except Exception:
+                    # Remplacer null par None pour que ast.literal_eval fonctionne
+                    context_str = filter_obj.context.replace('null', 'None').replace('true', 'True').replace('false', 'False')
+                    context = ast.literal_eval(context_str)
+                except Exception as e:
+                    _logger.warning("[TDB] Erreur parsing contexte du filtre: %s - context: %s", e, filter_obj.context)
                     context = {}
 
             # Fusionner avec le contexte actuel
             ctx = dict(request.env.context)
-            ctx.update(context)
+            # Conserver les informations importantes du contexte du filtre AVANT d'ajouter celles de la ligne
+            if context:
+                _logger.info("[TDB] Contexte du filtre à fusionner: %s", context)
+                ctx.update(context)
             
             # Ajouter le line_id au contexte pour qu'il soit accessible dans _get_list_data
             if line_id:
                 ctx['line_id'] = line_id
 
             # Appliquer overrides éventuels de la ligne (sur ctx)
+            # Ces overrides peuvent SURCHARGER le contexte du filtre si définis dans la ligne
             if line_id:
                 try:
                     line = request.env['is.tableau.de.bord.line'].browse(int(line_id))
                     if line and line.exists():
                         if line.display_mode and line.display_mode != 'auto':
                             ctx['search_default_view_type'] = line.display_mode
+                        # Seulement surcharger si la ligne a des valeurs définies
                         if line.graph_chart_type:
                             ctx['graph_chart_type'] = line.graph_chart_type
                         if line.graph_aggregator:
                             ctx['graph_aggregator'] = line.graph_aggregator
+                        if line.graph_measure:
+                            ctx['graph_measure'] = line.graph_measure
+                        if line.graph_groupbys:
+                            ctx['graph_groupbys'] = line.graph_groupbys
                         if line.pivot_row_groupby:
                             ctx['pivot_row_groupby'] = line.pivot_row_groupby
                         if line.pivot_col_groupby:
                             ctx['pivot_column_groupby'] = line.pivot_col_groupby
                         if line.pivot_measure:
                             ctx['pivot_measures'] = line.pivot_measure
-                except Exception:
-                    pass
+                        _logger.info("[TDB] Overrides depuis la ligne appliqués: graph_measure=%s graph_groupbys=%s", 
+                                   line.graph_measure, line.graph_groupbys)
+                except Exception as e:
+                    _logger.exception("[TDB] Erreur application overrides ligne: %s", e)
 
             # Appliquer aussi d'éventuels overrides envoyés côté client (sécurisé au scope utilisateur)
             if isinstance(overrides, dict):
@@ -208,24 +222,40 @@ class TableauDeBordController(http.Controller):
     def _get_graph_data(self, model, filter_obj, domain, context):
         """Génère les données pour un graphique simple"""
         groupbys = context.get('graph_groupbys') or context.get('group_by') or []
+        _logger.info("[TDB GRAPH] >>> Contexte complet: %s", context)
+        _logger.info("[TDB GRAPH] >>> groupbys brut: %s (type: %s)", groupbys, type(groupbys))
+        
         if isinstance(groupbys, str):
-            groupbys = [groupbys]
+            # Si c'est une chaîne séparée par des virgules, on split
+            if ',' in groupbys:
+                groupbys = [g.strip() for g in groupbys.split(',')]
+            else:
+                groupbys = [groupbys]
+        
+        _logger.info("[TDB GRAPH] >>> groupbys après traitement: %s", groupbys)
+        
         measure = context.get('graph_measure') or context.get('measure')
         aggregator = context.get('graph_aggregator') or 'sum'
         chart_type = context.get('graph_chart_type') or 'bar'
-        _logger.info("[TDB] graph groupbys=%s measure=%s agg=%s", groupbys, measure, aggregator)
+        _logger.info("[TDB GRAPH] >>> measure=%s agg=%s chart_type=%s", measure, aggregator, chart_type)
 
         agg_label = "Nombre d'enregistrements"
         use_count = not measure or str(measure) in ('count', '__count')
         fields = [] if use_count else [f"{measure}:{aggregator}"]
+        _logger.info("[TDB GRAPH] >>> use_count=%s fields=%s", use_count, fields)
+        
         if not use_count:
             agg_label = f"{aggregator} de {measure}"
 
         try:
+            _logger.info("[TDB GRAPH] >>> Appel read_group avec domain=%s fields=%s groupby=%s", domain, fields, groupbys)
             results = model.read_group(domain, fields=fields, groupby=groupbys, lazy=False)
-        except Exception:
+            _logger.info("[TDB GRAPH] >>> read_group retourne %s résultats", len(results))
+            for i, r in enumerate(results):
+                _logger.info("[TDB GRAPH] >>> Résultat %s: %s", i, r)
+        except Exception as e:
+            _logger.exception("[TDB GRAPH] >>> Erreur read_group: %s", e)
             results = []
-        _logger.debug("[TDB] graph results=%s", len(results))
 
         labels = []
         values = []
@@ -235,21 +265,30 @@ class TableauDeBordController(http.Controller):
                 for gb in groupbys:
                     base = gb.split(':')[0]
                     val = r.get(gb) or r.get(base) or r.get(f"{gb}_name") or r.get(f"{base}_name")
+                    _logger.info("[TDB GRAPH] >>> Extraction label pour groupby=%s: base=%s val=%s", gb, base, val)
                     label_parts.append(str(val) if val is not None else '')
-                labels.append(" / ".join([p for p in label_parts if p]))
+                label = " / ".join([p for p in label_parts if p])
+                labels.append(label)
+                
                 if use_count:
-                    values.append(r.get("__count") or 0)
+                    value = r.get("__count") or 0
                 else:
-                    values.append(r.get(f"{measure}_{aggregator}") or r.get(measure) or 0)
+                    value = r.get(f"{measure}_{aggregator}") or r.get(measure) or 0
+                values.append(value)
+                _logger.info("[TDB GRAPH] >>> Label: %s -> Valeur: %s", label, value)
         else:
+            _logger.info("[TDB GRAPH] >>> Pas de résultats, utilisation du count total")
             labels = ['Total']
             values = [model.search_count(domain)]
+
+        _logger.info("[TDB GRAPH] >>> Labels finaux: %s", labels)
+        _logger.info("[TDB GRAPH] >>> Valeurs finales: %s", values)
 
         # Ajuster la palette à la longueur
         palette = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
         bg = [palette[i % len(palette)] for i in range(len(values))]
 
-        return {
+        result = {
             'type': 'graph',
             'chart_type': chart_type,
             'data': {
@@ -261,6 +300,9 @@ class TableauDeBordController(http.Controller):
                 }]
             }
         }
+        
+        _logger.info("[TDB GRAPH] >>> Résultat final: %s", result)
+        return result
 
     def _get_pivot_data(self, model, filter_obj, domain, context):
         """Génère les données pour un tableau croisé; support 1D (lignes) et 2D (lignes x colonnes).
