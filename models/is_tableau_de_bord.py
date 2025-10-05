@@ -115,7 +115,8 @@ class IsTableauDeBordLine(models.Model):
     @api.depends('tableau_id')
     def _compute_model_ids(self):
         """Calcule la liste des IDs des modèles ayant au moins un filtre utilisateur"""
-        filters = self.env['ir.filters'].search([])
+        # Filtrer uniquement les filtres des utilisateurs (exclure les filtres système)
+        filters = self.env['ir.filters'].search([('user_id', '!=', False)])
         
         # Extraire les noms de modèles uniques
         model_names = list(set(filters.mapped('model_id')))
@@ -135,14 +136,12 @@ class IsTableauDeBordLine(models.Model):
     def _compute_filter_domain(self):
         """Calcule le domaine pour filter_id en fonction de model_id et user_id"""
         for record in self:
-            domain = []
+            domain = [('user_id', '!=', False)]  # Uniquement les filtres des utilisateurs
             if record.model_id:
                 domain.append(('model_id', '=', record.model_id.model))
             if record.user_id:
-                # Filtrer par utilisateur OU recherches globales (user_id = False)
-                domain.append('|')
+                # Filtrer par utilisateur spécifique
                 domain.append(('user_id', '=', record.user_id.id))
-                domain.append(('user_id', '=', False))
             record.filter_domain = str(domain)
 
 
@@ -162,95 +161,92 @@ class IsTableauDeBordLine(models.Model):
                 domain_valid = False
             if not domain_valid:
                 self.filter_id = False
+                # Vider la liste des champs si on réinitialise le filtre
+                if self.display_mode == 'list':
+                    self.field_ids = [(5, 0, 0)]
 
     @api.onchange('filter_id')
     def _onchange_filter_id(self):
         """Remplir automatiquement le nom, le modèle et l'utilisateur avec ceux du filtre"""
-        if self.filter_id:
-            self.name = self.filter_id.name
-            # Mettre à jour le modèle si pas encore défini
-            if not self.model_id:
-                self.model_id = self.env['ir.model'].search([('model', '=', self.filter_id.model_id)], limit=1)
-            # Mettre à jour l'utilisateur si pas encore défini
-            if not self.user_id and self.filter_id.user_id:
-                self.user_id = self.filter_id.user_id
-            
-            # Récupérer le display_mode depuis le filtre si renseigné
-            if self.filter_id.is_view_type:
-                view_type = self.filter_id.is_view_type
-                if view_type:
-                    self.display_mode = view_type
-                    print(f">>> Display mode depuis filtre: {self.display_mode}")
-            
-            # Extraire les informations du contexte pour les graphiques
-            if self.filter_id.context:
-                print(f">>> Contexte brut du filtre: {self.filter_id.context}")
-                try:
-                    import ast
-                    context = ast.literal_eval(self.filter_id.context) if isinstance(self.filter_id.context, str) else self.filter_id.context
-                    print(f">>> Contexte parsé: {context}")
-                    
-                    # Pour les graphiques
-                    if self.display_mode == 'graph' and isinstance(context, dict):
-                        print(f">>> Traitement contexte graphique")
-                        # Récupérer graph_mode (bar, line, pie)
-                        if 'graph_mode' in context:
-                            graph_mode = context['graph_mode']
-                            self.graph_chart_type = graph_mode if graph_mode in ['bar', 'line', 'pie'] else 'bar'
-                            print(f">>> graph_mode: {graph_mode} -> graph_chart_type: {self.graph_chart_type}")
-                        
-                        # Récupérer graph_measure
-                        if 'graph_measure' in context:
-                            self.graph_measure = context['graph_measure']
-                            print(f">>> graph_measure: {self.graph_measure}")
-                        
-                        # Récupérer graph_groupbys (liste)
-                        if 'graph_groupbys' in context:
-                            groupbys = context['graph_groupbys']
-                            print(f">>> graph_groupbys (brut): {groupbys}, type: {type(groupbys)}")
-                            if isinstance(groupbys, list):
-                                self.graph_groupbys = ','.join(groupbys)
-                            else:
-                                self.graph_groupbys = str(groupbys)
-                            print(f">>> graph_groupbys (stocké): {self.graph_groupbys}")
-                    
-                    # Pour les pivots
-                    elif self.display_mode == 'pivot' and isinstance(context, dict):
-                        print(f">>> Traitement contexte pivot")
-                        # Récupérer pivot_measures
-                        if 'pivot_measures' in context:
-                            measures = context['pivot_measures']
-                            if isinstance(measures, list) and measures:
-                                self.pivot_measure = measures[0]
-                            else:
-                                self.pivot_measure = str(measures)
-                            print(f">>> pivot_measures: {self.pivot_measure}")
-                        
-                        # Récupérer pivot_row_groupby
-                        if 'pivot_row_groupby' in context:
-                            row_groupby = context['pivot_row_groupby']
-                            if isinstance(row_groupby, list):
-                                self.pivot_row_groupby = ','.join(row_groupby)
-                            else:
-                                self.pivot_row_groupby = str(row_groupby)
-                            print(f">>> pivot_row_groupby: {self.pivot_row_groupby}")
-                        
-                        # Récupérer pivot_col_groupby
-                        if 'pivot_col_groupby' in context:
-                            col_groupby = context['pivot_col_groupby']
-                            if isinstance(col_groupby, list):
-                                self.pivot_col_groupby = ','.join(col_groupby)
-                            else:
-                                self.pivot_col_groupby = str(col_groupby)
-                            print(f">>> pivot_col_groupby: {self.pivot_col_groupby}")
-                
-                except Exception as e:
-                    print(f">>> Erreur parsing contexte: {e}")
-                    pass  # En cas d'erreur de parsing, on ignore
-              
-            # Charger les champs de la vue si display_mode est 'list'
+        if not self.filter_id:
+            # Si on désélectionne le filtre, vider la liste des champs
             if self.display_mode == 'list':
-                self._load_list_fields()
+                self.field_ids = [(5, 0, 0)]
+            return
+            
+        self.name = self.filter_id.name
+
+        # Mettre à jour le modèle si pas encore défini
+        if not self.model_id:
+            self.model_id = self.env['ir.model'].search([('model', '=', self.filter_id.model_id)], limit=1)
+        # Mettre à jour l'utilisateur si pas encore défini
+        if not self.user_id and self.filter_id.user_id:
+            self.user_id = self.filter_id.user_id
+        
+        # Récupérer le display_mode depuis le filtre si renseigné
+        if self.filter_id.is_view_type:
+            view_type = self.filter_id.is_view_type
+            if view_type:
+                self.display_mode = view_type
+        
+        # Extraire les informations du contexte pour les graphiques
+        if self.filter_id.context:
+            try:
+                import ast
+                context = ast.literal_eval(self.filter_id.context) if isinstance(self.filter_id.context, str) else self.filter_id.context
+                
+                # Pour les graphiques
+                if self.display_mode == 'graph' and isinstance(context, dict):
+                    # Récupérer graph_mode (bar, line, pie)
+                    if 'graph_mode' in context:
+                        graph_mode = context['graph_mode']
+                        self.graph_chart_type = graph_mode if graph_mode in ['bar', 'line', 'pie'] else 'bar'
+                    
+                    # Récupérer graph_measure
+                    if 'graph_measure' in context:
+                        self.graph_measure = context['graph_measure']
+                    
+                    # Récupérer graph_groupbys (liste)
+                    if 'graph_groupbys' in context:
+                        groupbys = context['graph_groupbys']
+                        if isinstance(groupbys, list):
+                            self.graph_groupbys = ','.join(groupbys)
+                        else:
+                            self.graph_groupbys = str(groupbys)
+                
+                # Pour les pivots
+                elif self.display_mode == 'pivot' and isinstance(context, dict):
+                    # Récupérer pivot_measures
+                    if 'pivot_measures' in context:
+                        measures = context['pivot_measures']
+                        if isinstance(measures, list) and measures:
+                            self.pivot_measure = measures[0]
+                        else:
+                            self.pivot_measure = str(measures)
+                    
+                    # Récupérer pivot_row_groupby
+                    if 'pivot_row_groupby' in context:
+                        row_groupby = context['pivot_row_groupby']
+                        if isinstance(row_groupby, list):
+                            self.pivot_row_groupby = ','.join(row_groupby)
+                        else:
+                            self.pivot_row_groupby = str(row_groupby)
+                    
+                    # Récupérer pivot_col_groupby
+                    if 'pivot_col_groupby' in context:
+                        col_groupby = context['pivot_col_groupby']
+                        if isinstance(col_groupby, list):
+                            self.pivot_col_groupby = ','.join(col_groupby)
+                        else:
+                            self.pivot_col_groupby = str(col_groupby)
+            
+            except Exception as e:
+                pass  # En cas d'erreur de parsing, on ignore
+        
+        # Charger les champs de la vue si display_mode est 'list'
+        # Recharger systématiquement les champs quand on change de filtre
+        if self.display_mode == 'list':
+            self._load_list_fields()
 
     @api.onchange('display_mode')
     def _onchange_display_mode(self):
@@ -267,11 +263,12 @@ class IsTableauDeBordLine(models.Model):
 
     def _load_list_fields(self):
         """Charge les champs de la vue liste par défaut ou depuis le filtre"""
-        if not self.filter_id or not self.model_id:
-            return
-        
         # Supprimer les champs existants
         self.field_ids = [(5, 0, 0)]
+        
+        # Si pas de filtre ou de modèle, laisser la liste vide
+        if not self.filter_id or not self.model_id:
+            return
         
         # Essayer de récupérer les champs depuis la vue enregistrée dans le filtre
         field_names = []
@@ -352,7 +349,6 @@ class IsTableauDeBordLine(models.Model):
                 context_str = self.filter_id.context.replace('null', 'None').replace('true', 'True').replace('false', 'False')
                 context = ast.literal_eval(context_str) if isinstance(context_str, str) else self.filter_id.context
             except Exception as e:
-                print(f">>> Erreur parsing contexte dans action_open_filter: {e}")
                 context = {}
         
         # Ajouter/Surcharger avec les informations de la ligne si définies
@@ -371,8 +367,6 @@ class IsTableauDeBordLine(models.Model):
             context['pivot_row_groupby'] = [g.strip() for g in self.pivot_row_groupby.split(',')]
         if self.pivot_col_groupby:
             context['pivot_col_groupby'] = [g.strip() for g in self.pivot_col_groupby.split(',')]
-        
-        print(f">>> action_open_filter - Contexte final: {context}")
         
         # Préparer le domaine
         domain = []
