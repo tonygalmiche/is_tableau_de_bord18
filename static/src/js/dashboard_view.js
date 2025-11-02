@@ -21,11 +21,32 @@ export class DashboardFormController extends FormController {
     }
 
     async setupDashboard() {
+        // Vérifier si l'utilisateur est gestionnaire
+        await this.checkUserPermissions();
+        
         // Attendre que le formulaire soit complètement chargé
         setTimeout(() => {
             this.createDashboardLayout();
             this.loadDashboardItems();
         }, 1500);
+    }
+
+    async checkUserPermissions() {
+        try {
+            // Vérifier si l'utilisateur appartient au groupe manager via notre méthode custom
+            const result = await rpc("/web/dataset/call_kw/is.tableau.de.bord/check_is_manager", {
+                model: 'is.tableau.de.bord',
+                method: 'check_is_manager',
+                args: [],
+                kwargs: {},
+            });
+            this.isManager = result;
+            console.log('[TDB] User is manager:', this.isManager);
+        } catch (error) {
+            console.error('[TDB] Error checking permissions:', error);
+            // En cas d'erreur, considérer l'utilisateur comme non-manager
+            this.isManager = false;
+        }
     }
 
     createDashboardLayout() {
@@ -61,6 +82,20 @@ export class DashboardFormController extends FormController {
             
             const widthCol = parseInt(line.width || 6, 10);
             const heightPx = parseInt(line.height || 400, 10);
+            
+            // Boutons d'édition uniquement pour les gestionnaires
+            let editButtons = '';
+            if (this.isManager) {
+                editButtons = `
+                    <a href="#" class="btn btn-sm btn-outline-info edit-line-link" data-line-id="${serverLineId}" title="Modifier la ligne du tableau de bord">
+                        <i class="fa fa-pencil"></i>
+                    </a>
+                    <a href="#" class="btn btn-sm btn-outline-secondary edit-filter-link" data-line-id="${serverLineId}" title="Modifier le filtre">
+                        <i class="fa fa-search"></i>
+                    </a>
+                `;
+            }
+            
             html += `
                 <div class="col-md-${isNaN(widthCol) ? 6 : widthCol} mb-3">
                     <div class="card h-100">
@@ -72,12 +107,7 @@ export class DashboardFormController extends FormController {
                                 <a href="#" class="btn btn-sm btn-outline-primary open-filter-link" data-line-id="${serverLineId}" title="Ouvrir la recherche complète en plein écran">
                                     <i class="fa fa-expand"></i> Plein écran
                                 </a>
-                                <a href="#" class="btn btn-sm btn-outline-info edit-line-link" data-line-id="${serverLineId}" title="Modifier la ligne du tableau de bord">
-                                    <i class="fa fa-pencil"></i>
-                                </a>
-                                <a href="#" class="btn btn-sm btn-outline-secondary edit-filter-link" data-line-id="${serverLineId}" title="Modifier le filtre">
-                                    <i class="fa fa-search"></i>
-                                </a>
+                                ${editButtons}
                             </div>
                         </div>
                         <div class="card-body p-0" style="height: ${isNaN(heightPx) ? 400 : heightPx}px; overflow: auto;">
@@ -99,11 +129,14 @@ export class DashboardFormController extends FormController {
     container.innerHTML = html;
     console.log("[TDB] Layout créé avec", record.data.line_ids.records.length, "éléments");
     
-    // Ajouter les gestionnaires d'événements pour les liens "Ouvrir en plein écran"
+    // Ajouter les gestionnaires d'événements
     setTimeout(() => {
         this.attachOpenFilterLinks();
-        this.attachEditLineLinks();
-        this.attachEditFilterLinks();
+        // Boutons d'édition uniquement pour les gestionnaires
+        if (this.isManager) {
+            this.attachEditLineLinks();
+            this.attachEditFilterLinks();
+        }
     }, 100);
     }
 
@@ -351,7 +384,12 @@ export class DashboardFormController extends FormController {
                     // divers formats -> stringify propre
                     val = val.display_name || val.name || JSON.stringify(val);
                 }
-                html += `<td>${val ?? ''}</td>`;
+                // Ne pas afficher false/null/undefined comme texte
+                let displayVal = '';
+                if (val !== null && val !== undefined && val !== false) {
+                    displayVal = val;
+                }
+                html += `<td>${displayVal}</td>`;
             }
             html += '</tr>';
         }
@@ -544,6 +582,12 @@ registry.category("views").add("form", {
         }
         
         // Déléguer les autres méthodes si nécessaire
+        async checkUserPermissions() {
+            if (this.props.context?.dashboard_mode) {
+                return DashboardFormController.prototype.checkUserPermissions.call(this);
+            }
+        }
+        
         async setupDashboard() {
             if (this.props.context?.dashboard_mode) {
                 return DashboardFormController.prototype.setupDashboard.call(this);

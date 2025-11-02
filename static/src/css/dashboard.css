@@ -1,12 +1,7 @@
 /* Styles pour le tableau de bord */
 
 .o_dashboard_view {
-    padding: 20px;
-}
-
-.o_dashboard_title {
-    border-bottom: 1px solid #dee2e6;
-    padding-bottom: 10px;
+    padding: 0;
 }
 
 .dashboard-item {
@@ -105,6 +100,11 @@
     box-shadow: none;
     padding: 0;
     margin: 0;
+    max-width: 100%;
+}
+
+.o_dashboard_form .o_form_sheet_bg {
+    padding: 0;
 }
 
 /* Styles pour le lien "Plein écran" */
@@ -129,7 +129,7 @@
 /* Responsive adjustments */
 @media (max-width: 768px) {
     .o_dashboard_view {
-        padding: 10px;
+        padding: 0;
     }
     
     .col-md-12,

@@ -153,22 +153,15 @@ class TableauDeBordController(http.Controller):
                     visible_fields = line.field_ids.filtered(lambda f: f.visible).sorted('sequence')
                     _logger.info("[TDB] Found %s visible fields in line configuration", len(visible_fields))
                     
-                    # Pour chaque champ configuré, on doit retrouver le nom technique depuis le label
-                    fields_get = model.fields_get()
-                    label_to_name = {v.get('string', ''): k for k, v in fields_get.items()}
-                    
+                    # Maintenant field_name contient le nom technique et field_label le libellé
                     for field_config in visible_fields:
-                        field_label = field_config.field_name
-                        # Chercher le nom technique du champ qui correspond à ce label
-                        field_name = label_to_name.get(field_label)
+                        field_name = field_config.field_name
+                        field_label = field_config.field_label or field_name
+                        
+                        # Vérifier que le champ existe dans le modèle
                         if field_name and field_name in model._fields:
                             explicit_fields.append(field_name)
                             field_labels[field_name] = field_label
-                        else:
-                            # Si pas trouvé par label, peut-être que c'est déjà un nom technique
-                            if field_label in model._fields:
-                                explicit_fields.append(field_label)
-                                field_labels[field_label] = fields_get.get(field_label, {}).get('string', field_label)
                     
                     _logger.info("[TDB] Mapped fields from line config: %s", explicit_fields)
             except Exception as e:

@@ -50,6 +50,47 @@ class IsTableauDeBord(models.Model):
             'views': [(self.env.ref('is_tableau_de_bord18.view_is_tableau_de_bord_form').id, 'form')],
         }
 
+    @api.model
+    def check_is_manager(self):
+        """Vérifier si l'utilisateur actuel est un gestionnaire de tableau de bord"""
+        return self.env.user.has_group('is_tableau_de_bord18.group_tableau_de_bord_manager')
+
+    @api.model
+    def action_open_tableaux_de_bord(self):
+        """Action pour ouvrir les tableaux de bord selon les droits de l'utilisateur"""
+        is_manager = self.env.user.has_group('is_tableau_de_bord18.group_tableau_de_bord_manager')
+        
+        if is_manager:
+            # Gestionnaire : accès complet avec kanban, list, form
+            view_mode = 'kanban,list,form'
+        else:
+            # Utilisateur simple : vue kanban seulement
+            view_mode = 'kanban'
+        
+
+        action = {
+            'type': 'ir.actions.act_window',
+            'name': 'Mes tableaux de bord',
+            'res_model': 'is.tableau.de.bord',
+            'view_mode': view_mode,
+            'domain': [('active', '=', True)],
+            'target': 'main',
+            'context': {},
+            'help': """
+                <p class="o_view_nocontent_smiling_face">
+                    Aucun tableau de bord disponible !
+                </p>
+            """ if not is_manager else """
+                <p class="o_view_nocontent_smiling_face">
+                    Aucun tableau de bord disponible !
+                </p>
+                <p>
+                    Créez d'abord vos tableaux de bord.
+                </p>
+            """
+        }
+        return action
+
 
 class IsTableauDeBordLine(models.Model):
     _name = 'is.tableau.de.bord.line'
@@ -318,16 +359,15 @@ class IsTableauDeBordLine(models.Model):
         # Récupérer le modèle pour obtenir les labels des champs
         model = self.env[self.filter_id.model_id]
         
-        # Créer les lignes de champs avec leur label
+        # Filtrer les champs valides (qui existent réellement dans le modèle)
+        valid_field_names = [fname for fname in field_names if fname and fname in model._fields]
+        
+        # Créer les lignes de champs avec leur nom technique
+        # Le libellé sera calculé automatiquement par _compute_field_label
         sequence = 10
-        for fname in field_names:
-            # Récupérer le label du champ
-            field_label = fname
-            if fname in model._fields:
-                field_label = model._fields[fname].string or fname
-            
+        for fname in valid_field_names:
             self.field_ids = [(0, 0, {
-                'field_name': field_label,
+                'field_name': fname,  # Nom technique (le label sera calculé automatiquement)
                 'visible': True,
                 'sequence': sequence,
             })]
@@ -445,5 +485,26 @@ class IsTableauDeBordLineField(models.Model):
 
     line_id = fields.Many2one('is.tableau.de.bord.line', string='Ligne', required=True, ondelete='cascade')
     sequence = fields.Integer('Séquence', default=10)
-    field_name = fields.Char('Nom du champ', required=True)
+    field_name = fields.Char('Nom du champ', required=True, help='Nom technique du champ')
+    field_label = fields.Char('Libellé du champ', compute='_compute_field_label', store=True, readonly=False, help='Libellé affiché du champ')
     visible = fields.Boolean('Visible', default=True, help='Afficher ce champ dans le tableau de bord')
+    
+    @api.depends('field_name', 'line_id.model_id')
+    def _compute_field_label(self):
+        """Calcule le libellé du champ à partir de son nom technique"""
+        for record in self:
+            if not record.field_name or not record.line_id or not record.line_id.model_id:
+                record.field_label = record.field_name or ''
+                continue
+            
+            try:
+                # Récupérer le modèle
+                model = self.env[record.line_id.model_id.model]
+                # Utiliser fields_get() pour obtenir le libellé traduit
+                fields_info = model.fields_get([record.field_name])
+                if record.field_name in fields_info:
+                    record.field_label = fields_info[record.field_name].get('string', record.field_name)
+                else:
+                    record.field_label = record.field_name
+            except Exception:
+                record.field_label = record.field_name
