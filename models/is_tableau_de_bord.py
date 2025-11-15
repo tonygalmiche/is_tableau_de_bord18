@@ -129,6 +129,7 @@ class IsTableauDeBordLine(models.Model):
     ], string='Largeur', default='6')
     
     height = fields.Selection([
+        ('200', 'Très petit (200px)'),
         ('300', 'Petit (300px)'),
         ('400', 'Moyen (400px)'),
         ('500', 'Grand (500px)'),
