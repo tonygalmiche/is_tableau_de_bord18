@@ -273,6 +273,7 @@ export class DashboardFormController extends FormController {
                     graph_chart_type: line.graph_chart_type,
                     graph_aggregator: line.graph_aggregator,
                     graph_show_legend: line.graph_show_legend,
+                    show_data_title: line.show_data_title,
                     pivot_row_groupby: line.pivot_row_groupby,
                     pivot_column_groupby: line.pivot_col_groupby,
                     pivot_measures: line.pivot_measure,
@@ -386,10 +387,17 @@ export class DashboardFormController extends FormController {
         const paddingClass = isPieChart ? 'p-1' : 'p-2';
         const titleMargin = isPieChart ? 'mb-0' : 'mb-1';
         const graphTitle = data.data?.datasets?.[0]?.label || 'Graphique';
-        let html = `<div class="${paddingClass} h-100 d-flex flex-column">
-            <div class="${titleMargin}">
+        const showDataTitle = data.show_data_title !== undefined ? data.show_data_title : true;
+        
+        let titleHtml = '';
+        if (showDataTitle) {
+            titleHtml = `<div class="${titleMargin}">
                 <h6 class="mb-0 small" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${graphTitle}">${graphTitle}</h6>
-            </div>
+            </div>`;
+        }
+        
+        let html = `<div class="${paddingClass} h-100 d-flex flex-column">
+            ${titleHtml}
             <div class="flex-grow-1 position-relative" style="min-height: 0;">
                 <canvas id="${chartId}" style="max-height: 100%; max-width: 100%;"></canvas>
             </div>
@@ -493,9 +501,12 @@ export class DashboardFormController extends FormController {
             const grandTotal = data.data.grand_total || null;
             const showRowTotals = rows.length > 0 && rows[0].hasOwnProperty('row_total');
             const showColTotals = colTotals !== null;
+            const showDataTitle = data.show_data_title !== undefined ? data.show_data_title : true;
             
             let html = '<div class="h-100 d-flex flex-column">';
-            html += '<div class="px-2 pt-2"><small class="text-muted">Mesure: <strong>' + measureLabel + '</strong></small></div>';
+            if (showDataTitle) {
+                html += '<div class="px-2 pt-2"><small class="text-muted">Mesure: <strong>' + measureLabel + '</strong></small></div>';
+            }
             html += '<div class="table-responsive flex-grow-1 px-2"><table class="table table-sm table-hover mb-0" style="font-size: 0.9rem;">';
             
             // header avec libellés améliorés
@@ -551,9 +562,12 @@ export class DashboardFormController extends FormController {
         const measureLabel = data.measure_label || 'Valeur';
         const rowLabel = data.row_label || 'Lignes';
         const showTotal = data.total !== undefined;
+        const showDataTitle = data.show_data_title !== undefined ? data.show_data_title : true;
         
         let html = '<div class="h-100 d-flex flex-column">';
-        html += '<div class="px-2 pt-2"><small class="text-muted">Mesure: <strong>' + measureLabel + '</strong></small></div>';
+        if (showDataTitle) {
+            html += '<div class="px-2 pt-2"><small class="text-muted">Mesure: <strong>' + measureLabel + '</strong></small></div>';
+        }
         html += '<div class="table-responsive flex-grow-1 px-2"><table class="table table-sm table-hover mb-0" style="font-size: 0.9rem;">';
         html += '<thead class="table-light"><tr><th>' + rowLabel + '</th><th class="text-end">' + measureLabel + '</th></tr></thead>';
         html += '<tbody>';

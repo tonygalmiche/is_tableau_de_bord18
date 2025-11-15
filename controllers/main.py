@@ -102,7 +102,7 @@ class TableauDeBordController(http.Controller):
             # Appliquer aussi d'éventuels overrides envoyés côté client (sécurisé au scope utilisateur)
             if isinstance(overrides, dict):
                 safe_keys = {
-                    'search_default_view_type', 'graph_chart_type', 'graph_aggregator', 'graph_show_legend',
+                    'search_default_view_type', 'graph_chart_type', 'graph_aggregator', 'graph_show_legend', 'show_data_title',
                     'pivot_row_groupby', 'pivot_column_groupby', 'pivot_measures',
                     'pivot_sort_by', 'pivot_sort_order',
                     'graph_groupbys', 'graph_measure', 'list_fields', 'measure', 'group_by'
@@ -251,6 +251,7 @@ class TableauDeBordController(http.Controller):
         aggregator = context.get('graph_aggregator') or 'sum'
         chart_type = context.get('graph_chart_type') or 'bar'
         show_legend = context.get('graph_show_legend', True)
+        show_data_title = context.get('show_data_title', True)
 
         agg_label = "Nombre d'enregistrements"
         use_count = not measure or str(measure) in ('count', '__count')
@@ -330,6 +331,7 @@ class TableauDeBordController(http.Controller):
             'type': 'graph',
             'chart_type': chart_type,
             'show_legend': show_legend,
+            'show_data_title': show_data_title,
             'data': {
                 'labels': labels,
                 'datasets': [{
@@ -420,6 +422,9 @@ class TableauDeBordController(http.Controller):
     def _get_pivot_data(self, model, filter_obj, domain, context, line=None):
         """Génère les données pour un tableau croisé; support 1D (lignes) et 2D (lignes x colonnes).
         Utilise les informations du contexte du filtre pour respecter les paramètres de la vue pivot standard."""
+        
+        # Récupérer show_data_title
+        show_data_title = context.get('show_data_title', True)
         
         # Déterminer la limite
         limit = None  # Pas de limite par défaut pour les pivots
@@ -547,6 +552,7 @@ class TableauDeBordController(http.Controller):
                     'row_label': row_label,
                     'col_label': col_label,
                 },
+                'show_data_title': show_data_title,
             }
             
             # Ajouter les totaux au résultat
@@ -598,6 +604,7 @@ class TableauDeBordController(http.Controller):
             'data': data_rows,
             'measure_label': measure_label,
             'row_label': row_label,
+            'show_data_title': show_data_title,
         }
         
         # Ajouter le total si demandé et si ce n'est pas déjà un total unique

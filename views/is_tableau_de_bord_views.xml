@@ -79,10 +79,12 @@
                     <group invisible="display_mode != 'graph'">
                         <field name="graph_chart_type"/>
                         <field name="graph_show_legend"/>
+                        <field name="show_data_title"/>
                         <field name="pivot_sort_by"/>
                         <field name="pivot_sort_order"/>
                     </group>
                     <group invisible="display_mode != 'pivot'" string="Options du tableau croisé">
+                        <field name="show_data_title"/>
                         <field name="pivot_sort_by"/>
                         <field name="pivot_sort_order"/>
                         <field name="pivot_show_row_totals"/>
@@ -179,6 +181,7 @@
                                 <field name="graph_chart_type"/>
                                 <field name="graph_groupbys"/>
                                 <field name="graph_show_legend"/>
+                                <field name="show_data_title"/>
                                 <field name="pivot_row_groupby"/>
                                 <field name="pivot_col_groupby"/>
                                 <field name="pivot_measure"/>
