@@ -14,7 +14,6 @@ export class DashboardFormController extends FormController {
         onMounted(() => {
             // Vérifier si nous sommes en mode dashboard
             if (this.props.context?.dashboard_mode) {
-                console.log('[TDB] Dashboard mode ON', this.props);
                 this.setupDashboard();
             }
         });
@@ -41,9 +40,7 @@ export class DashboardFormController extends FormController {
                 kwargs: {},
             });
             this.isManager = result;
-            console.log('[TDB] User is manager:', this.isManager);
         } catch (error) {
-            console.error('[TDB] Error checking permissions:', error);
             // En cas d'erreur, considérer l'utilisateur comme non-manager
             this.isManager = false;
         }
@@ -52,13 +49,11 @@ export class DashboardFormController extends FormController {
     createDashboardLayout() {
         const record = this.model.root;
         if (!record?.data?.line_ids?.records) {
-            console.log("[TDB] Aucune donnée de ligne trouvée", record?.data?.line_ids);
             return;
         }
 
         const container = document.getElementById('dashboard_container');
         if (!container) {
-            console.log("[TDB] Container dashboard non trouvé");
             return;
         }
 
@@ -127,7 +122,6 @@ export class DashboardFormController extends FormController {
         
         html += '</div>';
     container.innerHTML = html;
-    console.log("[TDB] Layout créé avec", record.data.line_ids.records.length, "éléments");
     
     // Ajouter les gestionnaires d'événements
     setTimeout(() => {
@@ -142,7 +136,6 @@ export class DashboardFormController extends FormController {
 
     attachOpenFilterLinks() {
         const links = document.querySelectorAll('.open-filter-link');
-        console.log("[TDB] Attaching event listeners to", links.length, "links");
         
         links.forEach(link => {
             link.addEventListener('click', async (e) => {
@@ -150,7 +143,6 @@ export class DashboardFormController extends FormController {
                 const lineId = parseInt(link.dataset.lineId);
                 
                 if (!lineId) {
-                    console.warn("[TDB] Pas de lineId pour ce lien");
                     return;
                 }
                 
@@ -161,7 +153,6 @@ export class DashboardFormController extends FormController {
 
     attachEditFilterLinks() {
         const links = document.querySelectorAll('.edit-filter-link');
-        console.log("[TDB] Attaching event listeners to", links.length, "edit filter links");
         
         links.forEach(link => {
             link.addEventListener('click', async (e) => {
@@ -169,7 +160,6 @@ export class DashboardFormController extends FormController {
                 const lineId = parseInt(link.dataset.lineId);
                 
                 if (!lineId) {
-                    console.warn("[TDB] Pas de lineId pour ce lien d'édition");
                     return;
                 }
                 
@@ -180,7 +170,6 @@ export class DashboardFormController extends FormController {
 
     attachEditLineLinks() {
         const links = document.querySelectorAll('.edit-line-link');
-        console.log("[TDB] Attaching event listeners to", links.length, "edit line links");
         
         links.forEach(link => {
             link.addEventListener('click', async (e) => {
@@ -188,7 +177,6 @@ export class DashboardFormController extends FormController {
                 const lineId = parseInt(link.dataset.lineId);
                 
                 if (!lineId) {
-                    console.warn("[TDB] Pas de lineId pour ce lien d'édition de ligne");
                     return;
                 }
                 
@@ -199,8 +187,6 @@ export class DashboardFormController extends FormController {
 
     async openFilterFullScreen(lineId) {
         try {
-            console.log("[TDB] Ouverture du filtre pour la ligne", lineId, "via action_open_filter");
-            
             // Appeler la méthode Python action_open_filter sur le modèle is.tableau.de.bord.line
             const result = await rpc("/web/dataset/call_kw/is.tableau.de.bord.line/action_open_filter", {
                 model: 'is.tableau.de.bord.line',
@@ -212,9 +198,7 @@ export class DashboardFormController extends FormController {
             if (result && result.type) {
                 // Exécuter l'action retournée par Python
                 await this.actionService.doAction(result);
-            } else {
-                console.warn("[TDB] Aucune action retournée par action_open_filter");
-            }
+            } 
             
         } catch (error) {
             console.error("[TDB] Erreur lors de l'ouverture du filtre:", error);
@@ -223,8 +207,6 @@ export class DashboardFormController extends FormController {
 
     async editFilter(lineId) {
         try {
-            console.log("[TDB] Édition du filtre pour la ligne", lineId, "via action_edit_filter");
-            
             // Appeler la méthode Python action_edit_filter sur le modèle is.tableau.de.bord.line
             const result = await rpc("/web/dataset/call_kw/is.tableau.de.bord.line/action_edit_filter", {
                 model: 'is.tableau.de.bord.line',
@@ -236,8 +218,6 @@ export class DashboardFormController extends FormController {
             if (result && result.type) {
                 // Exécuter l'action retournée par Python
                 await this.actionService.doAction(result);
-            } else {
-                console.warn("[TDB] Aucune action retournée par action_edit_filter");
             }
             
         } catch (error) {
@@ -247,8 +227,6 @@ export class DashboardFormController extends FormController {
 
     async editLine(lineId) {
         try {
-            console.log("[TDB] Édition de la ligne", lineId);
-            
             // Ouvrir le formulaire de la ligne en plein écran avec la vue dédiée
             await this.actionService.doAction({
                 type: 'ir.actions.act_window',
@@ -272,8 +250,6 @@ export class DashboardFormController extends FormController {
         const record = this.model.root;
         if (!record?.data?.line_ids?.records) return;
 
-    console.log("[TDB] Chargement des éléments du dashboard...");
-
     for (const lineRecord of record.data.line_ids.records) {
             const line = lineRecord.data;
             let filterId = null;
@@ -287,7 +263,6 @@ export class DashboardFormController extends FormController {
             if (filterId) {
         // Utiliser l'id serveur de la ligne si disponible pour le backend (overrides)
         const serverLineId = lineRecord.resId || line.id || (line._values && line._values.id) || lineRecord.id;
-        console.log("[TDB] Ligne", lineRecord.id, "(server:", serverLineId, ") filterId:", filterId, "name:", line.name, "width:", line.width, "height:", line.height);
                 const overrides = {
                     display_mode: line.display_mode,
                     graph_chart_type: line.graph_chart_type,
@@ -298,8 +273,6 @@ export class DashboardFormController extends FormController {
                     pivot_sort_by: line.pivot_sort_by,
                     pivot_sort_order: line.pivot_sort_order,
                 };
-                console.log("[TDB DEBUG JS] Line data - pivot_row_groupby:", line.pivot_row_groupby, "pivot_col_groupby:", line.pivot_col_groupby, "pivot_measure:", line.pivot_measure);
-                console.log("[TDB DEBUG JS] Overrides being sent:", overrides);
                 await this.loadFilterData(lineRecord.id, filterId, serverLineId, overrides);
             } else {
                 this.renderError(lineRecord.id, "Aucun filtre sélectionné");
@@ -311,12 +284,9 @@ export class DashboardFormController extends FormController {
         try {
             const lid = backendLineId || lineId;
             const dashboardId = this.model?.root?.resId;
-            console.log("[TDB] Appel RPC /tableau_de_bord/get_filter_data/", filterId, 'line', lid, '(container', lineId, ") overrides:", overrides, 'dashboard:', dashboardId);
             const data = await rpc("/tableau_de_bord/get_filter_data/" + filterId, { line_id: lid, overrides, dashboard_id: dashboardId });
-            console.log("[TDB] Données reçues:", data);
             this.renderFilterData(lineId, data);
         } catch (error) {
-            console.error("Erreur lors du chargement des données:", error);
             this.renderError(lineId, "Erreur lors du chargement des données: " + error.message);
         }
     }
@@ -324,7 +294,6 @@ export class DashboardFormController extends FormController {
     renderFilterData(lineId, data) {
         const container = document.getElementById(`dashboard_item_${lineId}`);
         if (!container) {
-            console.warn("[TDB] Container non trouvé pour lineId:", lineId);
             return;
         }
 
@@ -353,8 +322,6 @@ export class DashboardFormController extends FormController {
             container.innerHTML = '<div class="alert alert-info m-2">Aucune donnée à afficher</div>';
             return;
         }
-
-        console.log('[TDB] Render LIST with fields:', data.fields);
         
         // Filtrer les champs invalides
         const validFields = (data.fields || []).filter(f => f !== null && f !== undefined);
@@ -420,7 +387,6 @@ export class DashboardFormController extends FormController {
         container.innerHTML = html;
         container.className = "dashboard-item h-100";
 
-    console.log('[TDB] Render GRAPH with', data);
     const dataset = data.data?.datasets?.[0];
         const labels = data.data?.labels || [];
         if (!dataset) {
@@ -430,7 +396,6 @@ export class DashboardFormController extends FormController {
 
         // Si Chart global est disponible (injecté par Odoo web), dessiner; sinon fallback texte
     const el = document.getElementById(chartId);
-    console.log('[TDB] Chart available?', !!window.Chart, 'canvas?', !!el);
     if (window.Chart && el) {
             new window.Chart(el.getContext('2d'), {
                 type: data.chart_type || 'bar',
@@ -479,7 +444,6 @@ export class DashboardFormController extends FormController {
     }
 
     renderPivotData(container, data) {
-        console.log('[TDB] Render PIVOT with', data);
         // Support 2D matrix: data.data = { columns: [{label}], rows: [{row, values:[]}], measure_label, row_label, col_label }
         if (data.data && data.data.columns && data.data.rows) {
             const cols = data.data.columns;

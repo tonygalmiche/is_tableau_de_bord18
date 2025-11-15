@@ -21,7 +21,7 @@ class TableauDeBordController(http.Controller):
             if not line_id:
                 line_id = kwargs.get('line_id')
             overrides = kwargs.get('overrides') or {}
-            _logger.info("[TDB] get_filter_data filter_id=%s", filter_id)
+            
             filter_obj = request.env['ir.filters'].browse(filter_id)
             if not filter_obj.exists():
                 return {'error': 'Filtre non trouvé'}
@@ -44,14 +44,12 @@ class TableauDeBordController(http.Controller):
                     context_str = filter_obj.context.replace('null', 'None').replace('true', 'True').replace('false', 'False')
                     context = ast.literal_eval(context_str)
                 except Exception as e:
-                    _logger.warning("[TDB] Erreur parsing contexte du filtre: %s - context: %s", e, filter_obj.context)
                     context = {}
 
             # Fusionner avec le contexte actuel
             ctx = dict(request.env.context)
             # Conserver les informations importantes du contexte du filtre AVANT d'ajouter celles de la ligne
             if context:
-                _logger.info("[TDB] Contexte du filtre à fusionner: %s", context)
                 ctx.update(context)
             
             # Ajouter le line_id au contexte pour qu'il soit accessible dans _get_list_data
@@ -80,17 +78,12 @@ class TableauDeBordController(http.Controller):
                         if line.pivot_row_groupby:
                             # Convertir la chaîne en liste si nécessaire
                             ctx['pivot_row_groupby'] = [g.strip() for g in line.pivot_row_groupby.split(',')] if ',' in line.pivot_row_groupby else [line.pivot_row_groupby]
-                            _logger.info("[TDB DEBUG CTRL] pivot_row_groupby de la ligne: %s -> ctx: %s", line.pivot_row_groupby, ctx['pivot_row_groupby'])
                         if line.pivot_col_groupby:
                             # Convertir la chaîne en liste si nécessaire
                             ctx['pivot_column_groupby'] = [g.strip() for g in line.pivot_col_groupby.split(',')] if ',' in line.pivot_col_groupby else [line.pivot_col_groupby]
-                            _logger.info("[TDB DEBUG CTRL] pivot_col_groupby de la ligne: %s -> ctx pivot_column_groupby: %s", line.pivot_col_groupby, ctx['pivot_column_groupby'])
-                        else:
-                            _logger.warning("[TDB DEBUG CTRL] line.pivot_col_groupby est VIDE ou False!")
                         if line.pivot_measure:
                             # Convertir la chaîne en liste si nécessaire
                             ctx['pivot_measures'] = [g.strip() for g in line.pivot_measure.split(',')] if ',' in line.pivot_measure else [line.pivot_measure]
-                            _logger.info("[TDB DEBUG CTRL] pivot_measure de la ligne: %s -> ctx: %s", line.pivot_measure, ctx['pivot_measures'])
                         # Ajouter les paramètres de tri
                         if line.pivot_sort_by:
                             ctx['pivot_sort_by'] = line.pivot_sort_by
@@ -101,10 +94,8 @@ class TableauDeBordController(http.Controller):
                             ctx['pivot_show_row_totals'] = line.pivot_show_row_totals
                         if hasattr(line, 'pivot_show_col_totals'):
                             ctx['pivot_show_col_totals'] = line.pivot_show_col_totals
-                        _logger.info("[TDB] Overrides depuis la ligne appliqués: graph_measure=%s graph_groupbys=%s", 
-                                   line.graph_measure, line.graph_groupbys)
-                except Exception as e:
-                    _logger.exception("[TDB] Erreur application overrides ligne: %s", e)
+                except Exception:
+                    pass
 
             # Appliquer aussi d'éventuels overrides envoyés côté client (sécurisé au scope utilisateur)
             if isinstance(overrides, dict):
@@ -120,11 +111,8 @@ class TableauDeBordController(http.Controller):
                     elif k in safe_keys:
                         ctx[k] = v
 
-            _logger.debug("[TDB] ctx_keys=%s domain=%s", list(ctx.keys()), domain)
-
             # Déterminer le type de vue à utiliser
             view_type = self._get_view_type_from_context(ctx)
-            _logger.info("[TDB] view_type=%s model=%s", view_type, filter_obj.model_id)
 
             model = model.with_context(ctx)
             if view_type == 'graph':
@@ -134,9 +122,8 @@ class TableauDeBordController(http.Controller):
             else:
                 return self._get_list_data(model, filter_obj, domain, ctx, line)
 
-        except Exception as e:
-            _logger.exception("[TDB] get_filter_data error: %s", e)
-            return {'error': str(e)}
+        except Exception:
+            return {'error': 'Une erreur s\'est produite'}
 
     def _get_view_type_from_context(self, context):
         """Détermine le type de vue à partir du contexte"""
@@ -177,7 +164,6 @@ class TableauDeBordController(http.Controller):
                 if line and line.exists() and line.field_ids:
                     # Récupérer uniquement les champs visibles
                     visible_fields = line.field_ids.filtered(lambda f: f.visible).sorted('sequence')
-                    _logger.info("[TDB] Found %s visible fields in line configuration", len(visible_fields))
                     
                     # Maintenant field_name contient le nom technique et field_label le libellé
                     for field_config in visible_fields:
@@ -189,9 +175,8 @@ class TableauDeBordController(http.Controller):
                             explicit_fields.append(field_name)
                             field_labels[field_name] = field_label
                     
-                    _logger.info("[TDB] Mapped fields from line config: %s", explicit_fields)
-            except Exception as e:
-                _logger.exception("[TDB] Error loading field_ids from line: %s", e)
+            except Exception:
+                pass
         
         # 2) Champs explicitement définis dans le favori (list_fields)
         if not explicit_fields and context.get('list_fields'):
@@ -223,7 +208,6 @@ class TableauDeBordController(http.Controller):
             fields_to_display = explicit_fields
         else:
             fields_to_display, field_labels = self._get_fields_from_view(model, 'list', view_id=view_id)
-        _logger.info("[TDB] list fields=%s (view_id=%s)", fields_to_display, view_id)
 
         recs = model.search(domain, limit=limit)
         data = recs.read(fields_to_display) if recs else []
@@ -253,8 +237,6 @@ class TableauDeBordController(http.Controller):
             sort_order = line.pivot_sort_order
         
         groupbys = context.get('graph_groupbys') or context.get('group_by') or []
-        _logger.info("[TDB GRAPH] >>> Contexte complet: %s", context)
-        _logger.info("[TDB GRAPH] >>> groupbys brut: %s (type: %s)", groupbys, type(groupbys))
         
         if isinstance(groupbys, str):
             # Si c'est une chaîne séparée par des virgules, on split
@@ -263,28 +245,21 @@ class TableauDeBordController(http.Controller):
             else:
                 groupbys = [groupbys]
         
-        _logger.info("[TDB GRAPH] >>> groupbys après traitement: %s", groupbys)
-        
         measure = context.get('graph_measure') or context.get('measure')
         aggregator = context.get('graph_aggregator') or 'sum'
         chart_type = context.get('graph_chart_type') or 'bar'
-        _logger.info("[TDB GRAPH] >>> measure=%s agg=%s chart_type=%s", measure, aggregator, chart_type)
 
         agg_label = "Nombre d'enregistrements"
         use_count = not measure or str(measure) in ('count', '__count')
         fields = [] if use_count else [f"{measure}:{aggregator}"]
-        _logger.info("[TDB GRAPH] >>> use_count=%s fields=%s", use_count, fields)
         
         if not use_count:
             agg_label = f"{aggregator} de {measure}"
 
         try:
             # NE PAS appliquer limit dans read_group (on le fera après le tri)
-            _logger.info("[TDB GRAPH] >>> Appel read_group avec domain=%s fields=%s groupby=%s (sans limit)", domain, fields, groupbys)
             results = model.read_group(domain, fields=fields, groupby=groupbys, lazy=False)
-            _logger.info("[TDB GRAPH] >>> read_group retourne %s résultats", len(results))
-        except Exception as e:
-            _logger.exception("[TDB GRAPH] >>> Erreur read_group: %s", e)
+        except Exception:
             results = []
 
         # Construire les labels et valeurs
@@ -295,7 +270,6 @@ class TableauDeBordController(http.Controller):
                 for gb in groupbys:
                     base = gb.split(':')[0]
                     val = r.get(gb) or r.get(base) or r.get(f"{gb}_name") or r.get(f"{base}_name")
-                    _logger.info("[TDB GRAPH] >>> Extraction label pour groupby=%s: base=%s val=%s", gb, base, val)
                     label_parts.append(str(val) if val is not None else '')
                 label = " / ".join([p for p in label_parts if p])
                 
@@ -305,37 +279,27 @@ class TableauDeBordController(http.Controller):
                     value = r.get(f"{measure}_{aggregator}") or r.get(measure) or 0
                 
                 data_list.append({'label': label, 'value': value})
-                _logger.info("[TDB GRAPH] >>> Label: %s -> Valeur: %s", label, value)
         else:
-            _logger.info("[TDB GRAPH] >>> Pas de résultats, utilisation du count total")
             total_count = model.search_count(domain)
             data_list = [{'label': 'Total', 'value': total_count}]
 
         # Appliquer le tri et la limite
-        _logger.info("[TDB GRAPH] >>> Avant tri: %s éléments", len(data_list))
-        
         if sort_by == 'total':
             # Tri par valeur
             reverse = (sort_order == 'desc')
             data_list.sort(key=lambda x: x['value'], reverse=reverse)
-            _logger.info("[TDB GRAPH] >>> Tri par valeur (%s)", sort_order)
         else:
             # Tri par libellé (smart key)
             reverse = (sort_order == 'desc')
             data_list.sort(key=lambda x: self._sort_key_smart(x['label']), reverse=reverse)
-            _logger.info("[TDB GRAPH] >>> Tri par libellé (%s)", sort_order)
         
         # Appliquer la limite après le tri
         if limit and limit > 0:
             data_list = data_list[:limit]
-            _logger.info("[TDB GRAPH] >>> Après limite: %s éléments", len(data_list))
         
         # Extraire les labels et valeurs triés/limités
         labels = [item['label'] for item in data_list]
         values = [item['value'] for item in data_list]
-
-        _logger.info("[TDB GRAPH] >>> Labels finaux: %s", labels)
-        _logger.info("[TDB GRAPH] >>> Valeurs finales: %s", values)
 
         # Ajuster la palette à la longueur
         palette = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
@@ -354,7 +318,6 @@ class TableauDeBordController(http.Controller):
             }
         }
         
-        _logger.info("[TDB GRAPH] >>> Résultat final: %s", result)
         return result
 
     def _get_selection_map(self, model, field_name):
@@ -416,15 +379,6 @@ class TableauDeBordController(http.Controller):
         sort_order = context.get('pivot_sort_order', 'asc')
         reverse = (sort_order == 'desc')
         
-        log_prefix = "[TDB PIVOT SORT]" if is_2d else "[TDB PIVOT 1D SORT]"
-        _logger.info("%s Avant tri: %s lignes, sort_by=%s, sort_order=%s, reverse=%s", 
-                    log_prefix, len(rows), sort_by, sort_order, reverse)
-        
-        if is_2d:
-            _logger.info("%s Lignes avant tri: %s", log_prefix, [(r['row'], sum(r['values'])) for r in rows[:5]])
-        else:
-            _logger.info("%s Lignes avant tri: %s", log_prefix, [(r['row'], r['value']) for r in rows[:5]])
-        
         if sort_by == 'total':
             # Trier par le total
             if is_2d:
@@ -435,14 +389,8 @@ class TableauDeBordController(http.Controller):
             # Trier par le libellé de la ligne
             rows.sort(key=lambda r: self._sort_key_smart(r['row']), reverse=reverse)
         
-        if is_2d:
-            _logger.info("%s Lignes après tri: %s", log_prefix, [(r['row'], sum(r['values'])) for r in rows[:5]])
-        else:
-            _logger.info("%s Lignes après tri: %s", log_prefix, [(r['row'], r['value']) for r in rows[:5]])
-        
-        # Appliquer la limite APRÈS le tri
+        # Appliquer la limite après le tri
         if limit and limit > 0:
-            _logger.info("%s Application de la limite: %s lignes -> %s lignes", log_prefix, len(rows), limit)
             rows = rows[:limit]
         
         return rows
@@ -462,10 +410,8 @@ class TableauDeBordController(http.Controller):
             row_gb = row_gb[0] if row_gb else None
         
         col_gb = context.get('pivot_column_groupby')
-        _logger.info("[TDB DEBUG PIVOT] pivot_column_groupby brut du context: %s (type: %s)", col_gb, type(col_gb))
         if isinstance(col_gb, list):
             col_gb = col_gb[0] if col_gb else None
-        _logger.info("[TDB DEBUG PIVOT] col_gb après traitement: %s", col_gb)
         
         # Pour la mesure, utiliser graph_measure du contexte si pivot_measures n'est pas défini
         measures = context.get('pivot_measures') or context.get('graph_measure') or context.get('measure')
@@ -473,9 +419,6 @@ class TableauDeBordController(http.Controller):
             measure = measures[0] if measures else None
         else:
             measure = measures
-        
-        _logger.info("[TDB] pivot row_gb=%s col_gb=%s measure=%s context_keys=%s", 
-                     row_gb, col_gb, measure, list(context.keys()))
 
         use_count = not measure or str(measure) in ('count', '__count')
         fields = [] if use_count else [f"{measure}:sum"]
@@ -606,8 +549,8 @@ class TableauDeBordController(http.Controller):
                     label = self._extract_label_from_record(r, row_gb, row_selection_map)
                     value = (r.get('__count') if use_count else (r.get(f"{measure}_sum") or r.get(measure))) or 0
                     data_rows.append({'row': label, 'value': value})
-            except Exception as e:
-                _logger.exception("[TDB] Error in 1D pivot: %s", e)
+            except Exception:
+                pass
 
         if not data_rows:
             # Retourner un total cohérent (sum de measure si défini, sinon count)
@@ -625,8 +568,6 @@ class TableauDeBordController(http.Controller):
         else:
             # Trier et limiter (sauf si c'est juste le total)
             data_rows = self._sort_and_limit_rows(data_rows, context, limit, is_2d=False)
-
-        _logger.debug("[TDB] pivot rows=%s", len(data_rows))
         
         # Calculer le total général pour les pivots 1D si demandé
         show_col_totals = context.get('pivot_show_col_totals', True)
@@ -666,29 +607,22 @@ class TableauDeBordController(http.Controller):
                             #     continue
                             names.append(name)
                 return names, fields_def
-
-            _logger.info("[TDB] Getting fields for model=%s view_type=%s view_id=%s", model._name, vt_primary, view_id)
             
             # Vérifier si le modèle a la méthode fields_view_get
             if hasattr(model, 'fields_view_get'):
                 view = model.fields_view_get(view_id=view_id, view_type=vt_primary)
                 field_names, fields_def = _extract(view)
-                _logger.info("[TDB] Primary view extraction: %s fields", len(field_names))
 
                 if not field_names:
-                    _logger.info("[TDB] Trying fallback view type: %s", vt_fallback)
                     view2 = model.fields_view_get(view_type=vt_fallback)
                     field_names, fields_def = _extract(view2)
-                    _logger.info("[TDB] Fallback view extraction: %s fields", len(field_names))
 
                 if len(field_names) <= 1:
-                    _logger.info("[TDB] Searching for alternative views in ir.ui.view")
                     View = request.env['ir.ui.view'].sudo()
                     candidates = View.search([
                         ('model', '=', model._name),
                         ('type', 'in', ['list', 'tree'])
                     ], order='priority, id')
-                    _logger.info("[TDB] Found %s candidate views", len(candidates))
                     for v in candidates:
                         try:
                             vt = v.type or 'list'
@@ -696,18 +630,14 @@ class TableauDeBordController(http.Controller):
                             fn, fd = _extract(vres)
                             if len(fn) > 1:
                                 field_names, fields_def = fn, fd
-                                _logger.info("[TDB] Using alternative view %s with %s fields", v.id, len(fn))
                                 break
-                        except Exception as e:
-                            _logger.debug("[TDB] Failed to load view %s: %s", v.id, e)
+                        except Exception:
                             continue
             else:
-                _logger.info("[TDB] Model %s has no fields_view_get method, using fields directly", model._name)
                 field_names = []
                 fields_def = {}
 
             if not field_names:
-                _logger.warning("[TDB] No fields found in views, using model fields directly")
                 # Récupérer tous les champs du modèle (sauf relations complexes et binaires)
                 field_names = []
                 for fname, fdef in model._fields.items():
@@ -736,9 +666,7 @@ class TableauDeBordController(http.Controller):
                 fields_def = model.fields_get(field_names)
 
             # Ne pas limiter le nombre de champs pour afficher toutes les colonnes de la vue
-            _logger.info("[TDB] Final field list: %s fields - %s", len(field_names), field_names[:10])
             labels = {fn: fields_def.get(fn, {}).get('string', fn) for fn in field_names}
             return field_names, labels
-        except Exception as e:
-            _logger.exception("[TDB] Error in _get_fields_from_view: %s", e)
+        except Exception:
             return ['display_name'], {'display_name': 'Nom à afficher'}

@@ -22,7 +22,7 @@ patch(SearchModel.prototype, {
             const currentApp = menuService?.getCurrentApp();
             activeMenuId = currentApp?.id || false;
         } catch (e) {
-            console.warn("[IS_TABLEAU_DE_BORD] Impossible de récupérer le menu courant:", e);
+            // Erreur lors de la récupération du menu courant
         }
         
         // Récupérer les informations de la vue courante

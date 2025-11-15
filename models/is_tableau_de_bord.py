@@ -99,7 +99,6 @@ class IsTableauDeBord(models.Model):
             if line.filter_id:
                 extracted = line._extract_filter_context_values(line.filter_id)
                 if extracted:
-                    print(f"[TDB DEBUG MODEL] Rafraîchissement ligne {line.id}: {line.name} - extracted: {extracted}")
                     line.write(extracted)
                     updated_count += 1
         
@@ -300,19 +299,12 @@ class IsTableauDeBordLine(models.Model):
                     # Récupérer pivot_column_groupby (la clé standard dans les favoris)
                     if 'pivot_column_groupby' in context:
                         col_groupby = context['pivot_column_groupby']
-                        print(f"[TDB DEBUG MODEL] pivot_column_groupby trouvé dans context: {col_groupby} (type: {type(col_groupby)})")
                         if isinstance(col_groupby, list):
                             self.pivot_col_groupby = ','.join(col_groupby)
                         else:
                             self.pivot_col_groupby = str(col_groupby)
-                        print(f"[TDB DEBUG MODEL] pivot_col_groupby défini à: {self.pivot_col_groupby}")
-                    else:
-                        print(f"[TDB DEBUG MODEL] pivot_column_groupby PAS dans context. Clés disponibles: {list(context.keys())}")
             
-            except Exception as e:
-                print(f"[TDB DEBUG MODEL] ERREUR dans _onchange_filter_id: {e}")
-                import traceback
-                traceback.print_exc()
+            except Exception:
                 pass  # En cas d'erreur de parsing, on ignore
         
         # Charger les champs de la vue si display_mode est 'list'
@@ -460,13 +452,9 @@ class IsTableauDeBordLine(models.Model):
                 else:
                     result['graph_groupbys'] = str(groupbys)
             
-            print(f"[TDB DEBUG MODEL] _extract_filter_context_values result: {result}")
             return result
             
-        except Exception as e:
-            print(f"[TDB DEBUG MODEL] Error in _extract_filter_context_values: {e}")
-            import traceback
-            traceback.print_exc()
+        except Exception:
             return {}
 
     @api.model_create_multi
@@ -481,7 +469,6 @@ class IsTableauDeBordLine(models.Model):
                 for key, value in extracted.items():
                     if key not in vals or not vals[key]:
                         vals[key] = value
-                print(f"[TDB DEBUG MODEL] create - vals after extraction: pivot_col_groupby={vals.get('pivot_col_groupby')}")
         
         return super().create(vals_list)
 
@@ -496,7 +483,6 @@ class IsTableauDeBordLine(models.Model):
                 for key, value in extracted.items():
                     if key not in vals or not vals[key]:
                         vals[key] = value
-                print(f"[TDB DEBUG MODEL] write - vals after extraction: pivot_col_groupby={vals.get('pivot_col_groupby')}")
         
         return super().write(vals)
 
@@ -509,7 +495,6 @@ class IsTableauDeBordLine(models.Model):
             
             extracted = record._extract_filter_context_values(record.filter_id)
             if extracted:
-                print(f"[TDB DEBUG MODEL] action_refresh_from_filter - extracted: {extracted}")
                 record.write(extracted)
         
         return {
