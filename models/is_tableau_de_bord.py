@@ -161,6 +161,14 @@ class IsTableauDeBordLine(models.Model):
     pivot_row_groupby = fields.Char('Pivot: Groupe lignes')
     pivot_col_groupby = fields.Char('Pivot: Groupe colonnes')
     pivot_measure     = fields.Char('Pivot: Mesure (champ numérique)')
+    pivot_sort_by = fields.Selection([
+        ('row', 'Tri des lignes'),
+        ('total', 'Tri des totaux'),
+    ], string='Tri par', default='row', help='Critère de tri pour le tableau croisé')
+    pivot_sort_order = fields.Selection([
+        ('asc', 'Tri croissant'),
+        ('desc', 'Tri décroissant'),
+    ], string='Ordre du tri', default='asc', help='Ordre de tri pour le tableau croisé')
     filter_domain     = fields.Char(compute='_compute_filter_domain', store=False)
     field_ids         = fields.One2many('is.tableau.de.bord.line.field', 'line_id', string='Champs de la liste')
     model_ids         = fields.Many2many('ir.model', compute='_compute_model_ids', store=False, compute_sudo=True)

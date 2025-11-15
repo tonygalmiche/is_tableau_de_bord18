@@ -295,6 +295,8 @@ export class DashboardFormController extends FormController {
                     pivot_row_groupby: line.pivot_row_groupby,
                     pivot_column_groupby: line.pivot_col_groupby,
                     pivot_measures: line.pivot_measure,
+                    pivot_sort_by: line.pivot_sort_by,
+                    pivot_sort_order: line.pivot_sort_order,
                 };
                 console.log("[TDB DEBUG JS] Line data - pivot_row_groupby:", line.pivot_row_groupby, "pivot_col_groupby:", line.pivot_col_groupby, "pivot_measure:", line.pivot_measure);
                 console.log("[TDB DEBUG JS] Overrides being sent:", overrides);

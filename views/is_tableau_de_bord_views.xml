@@ -35,6 +35,8 @@
                                 <field name="pivot_row_groupby" optional="hide"/>
                                 <field name="pivot_col_groupby" optional="hide"/>
                                 <field name="pivot_measure" optional="hide"/>
+                                <field name="pivot_sort_by" optional="hide"/>
+                                <field name="pivot_sort_order" optional="hide"/>
                             </list>
                         </field>
                     </group>
@@ -72,11 +74,10 @@
                     <group invisible="display_mode != 'graph'">
                         <field name="graph_chart_type"/>
                     </group>
-                    <!-- <group invisible="display_mode != 'pivot'">
-                        <field name="pivot_row_groupby" placeholder="ex: invoice_date:year"/>
-                        <field name="pivot_col_groupby" placeholder="ex: partner_id"/>
-                        <field name="pivot_measure" placeholder="ex: price_subtotal"/>
-                    </group> -->
+                    <group invisible="display_mode != 'pivot'" string="Options du tableau croisé">
+                        <field name="pivot_sort_by"/>
+                        <field name="pivot_sort_order"/>
+                    </group>
                     <group invisible="display_mode != 'list'">
                         <field name="field_ids">
                             <list editable="bottom">
@@ -170,6 +171,8 @@
                                 <field name="pivot_row_groupby"/>
                                 <field name="pivot_col_groupby"/>
                                 <field name="pivot_measure"/>
+                                <field name="pivot_sort_by"/>
+                                <field name="pivot_sort_order"/>
                             </list>
                         </field>
                     </div>

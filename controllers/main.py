@@ -89,6 +89,11 @@ class TableauDeBordController(http.Controller):
                             # Convertir la chaîne en liste si nécessaire
                             ctx['pivot_measures'] = [g.strip() for g in line.pivot_measure.split(',')] if ',' in line.pivot_measure else [line.pivot_measure]
                             _logger.info("[TDB DEBUG CTRL] pivot_measure de la ligne: %s -> ctx: %s", line.pivot_measure, ctx['pivot_measures'])
+                        # Ajouter les paramètres de tri
+                        if line.pivot_sort_by:
+                            ctx['pivot_sort_by'] = line.pivot_sort_by
+                        if line.pivot_sort_order:
+                            ctx['pivot_sort_order'] = line.pivot_sort_order
                         _logger.info("[TDB] Overrides depuis la ligne appliqués: graph_measure=%s graph_groupbys=%s", 
                                    line.graph_measure, line.graph_groupbys)
                 except Exception as e:
@@ -99,6 +104,7 @@ class TableauDeBordController(http.Controller):
                 safe_keys = {
                     'search_default_view_type', 'graph_chart_type', 'graph_aggregator',
                     'pivot_row_groupby', 'pivot_column_groupby', 'pivot_measures',
+                    'pivot_sort_by', 'pivot_sort_order',
                     'graph_groupbys', 'graph_measure', 'list_fields', 'measure', 'group_by'
                 }
                 for k, v in overrides.items():
@@ -366,10 +372,33 @@ class TableauDeBordController(http.Controller):
                 results = model.read_group(domain, fields=fields or ["__count"], groupby=[row_gb, col_gb], lazy=False)
             except Exception:
                 results = []
+            
+            # Récupérer les informations des champs pour gérer les Selection
+            row_field_name = row_gb.split(':')[0]
+            col_field_name = col_gb.split(':')[0]
+            
+            # Récupérer les définitions de champs
+            fields_info = model.fields_get([row_field_name, col_field_name])
+            row_field_info = fields_info.get(row_field_name, {})
+            col_field_info = fields_info.get(col_field_name, {})
+            
+            # Créer des dictionnaires de mapping pour les Selection
+            row_selection_map = {}
+            col_selection_map = {}
+            
+            if row_field_info.get('type') == 'selection' and row_field_info.get('selection'):
+                row_selection_map = dict(row_field_info['selection'])
+            
+            if col_field_info.get('type') == 'selection' and col_field_info.get('selection'):
+                col_selection_map = dict(col_field_info['selection'])
+            
+            _logger.info("[TDB DEBUG] col_field_info: %s", col_field_info)
+            _logger.info("[TDB DEBUG] col_selection_map: %s", col_selection_map)
+            
             # collect columns
             col_labels = []
             col_index = {}
-            def _label_for(rec, gb):
+            def _label_for(rec, gb, selection_map=None):
                 full = (gb or '')
                 base = full.split(':')[0]
                 # tenter d'abord la clé complète (utile pour date gb: field:year)
@@ -377,6 +406,9 @@ class TableauDeBordController(http.Controller):
                 # Pour les many2one, prendre le display_name
                 if isinstance(val, (list, tuple)) and len(val) > 1:
                     return val[1]  # [id, display_name]
+                # Pour les Selection, chercher le libellé
+                if selection_map and val in selection_map:
+                    return selection_map[val]
                 # Pour les dates avec groupement temporel
                 if rec.get(f"{base}") and ':' in full:
                     return str(val) if val else 'Indéfini'
@@ -384,8 +416,8 @@ class TableauDeBordController(http.Controller):
             # build rows structure
             rows_map = {}
             for r in results:
-                rlab = _label_for(r, row_gb)
-                clab = _label_for(r, col_gb)
+                rlab = _label_for(r, row_gb, row_selection_map)
+                clab = _label_for(r, col_gb, col_selection_map)
                 if clab not in col_index:
                     col_index[clab] = len(col_labels)
                     col_labels.append(clab)
@@ -402,6 +434,37 @@ class TableauDeBordController(http.Controller):
                     vals.extend([0] * (len(col_labels) - len(vals)))
             # build rows list
             rows = [{'row': rlab, 'values': vals} for rlab, vals in rows_map.items()]
+            
+            # Appliquer le tri selon les paramètres
+            sort_by = context.get('pivot_sort_by', 'row')
+            sort_order = context.get('pivot_sort_order', 'asc')
+            reverse = (sort_order == 'desc')
+            
+            _logger.info("[TDB PIVOT SORT] Avant tri: %s lignes, sort_by=%s, sort_order=%s, reverse=%s", 
+                        len(rows), sort_by, sort_order, reverse)
+            _logger.info("[TDB PIVOT SORT] Lignes avant tri: %s", [(r['row'], sum(r['values'])) for r in rows[:5]])
+            
+            if sort_by == 'total':
+                # Trier par le total de chaque ligne
+                rows.sort(key=lambda r: sum(r['values']), reverse=reverse)
+            else:
+                # Trier par le libellé de la ligne
+                # Essayer d'abord un tri numérique, sinon alphabétique
+                def sort_key(r):
+                    label = r['row']
+                    if label is None:
+                        return (1, '')  # Les None à la fin
+                    # Essayer de convertir en nombre pour tri numérique
+                    try:
+                        return (0, float(str(label).replace(',', '.').replace(' ', '')))
+                    except (ValueError, AttributeError):
+                        # Si ce n'est pas un nombre, tri alphabétique insensible à la casse
+                        return (1, str(label).lower())
+                
+                rows.sort(key=sort_key, reverse=reverse)
+            
+            _logger.info("[TDB PIVOT SORT] Lignes après tri: %s", [(r['row'], sum(r['values'])) for r in rows[:5]])
+            
             # sort columns by label for stability
             columns = [{'key': i, 'label': lbl} for i, lbl in enumerate(col_labels)]
             return {
@@ -418,6 +481,16 @@ class TableauDeBordController(http.Controller):
         # 1D pivot (lignes uniquement)
         data_rows = []
         if row_gb:
+            # Récupérer les informations du champ pour gérer les Selection
+            row_field_name = row_gb.split(':')[0]
+            fields_info = model.fields_get([row_field_name])
+            row_field_info = fields_info.get(row_field_name, {})
+            
+            # Créer un dictionnaire de mapping pour les Selection
+            row_selection_map = {}
+            if row_field_info.get('type') == 'selection' and row_field_info.get('selection'):
+                row_selection_map = dict(row_field_info['selection'])
+            
             try:
                 results = model.read_group(domain, fields=fields or ["__count"], groupby=[row_gb], lazy=False)
                 for r in results:
@@ -427,6 +500,9 @@ class TableauDeBordController(http.Controller):
                     # Pour les many2one, prendre le display_name
                     if isinstance(val, (list, tuple)) and len(val) > 1:
                         label = val[1]  # [id, display_name]
+                    # Pour les Selection, chercher le libellé
+                    elif row_selection_map and val in row_selection_map:
+                        label = row_selection_map[val]
                     else:
                         label = str(val) if val is not None else 'Indéfini'
                     value = (r.get('__count') if use_count else (r.get(f"{measure}_sum") or r.get(measure))) or 0
@@ -447,6 +523,36 @@ class TableauDeBordController(http.Controller):
             if total_value is None:
                 total_value = model.search_count(domain)
             data_rows = [{'row': 'Total', 'value': total_value}]
+        else:
+            # Appliquer le tri selon les paramètres (sauf si c'est juste le total)
+            sort_by = context.get('pivot_sort_by', 'row')
+            sort_order = context.get('pivot_sort_order', 'asc')
+            reverse = (sort_order == 'desc')
+            
+            _logger.info("[TDB PIVOT 1D SORT] Avant tri: %s lignes, sort_by=%s, sort_order=%s, reverse=%s", 
+                        len(data_rows), sort_by, sort_order, reverse)
+            _logger.info("[TDB PIVOT 1D SORT] Lignes avant tri: %s", [(r['row'], r['value']) for r in data_rows[:5]])
+            
+            if sort_by == 'total':
+                # Trier par la valeur
+                data_rows.sort(key=lambda r: r['value'], reverse=reverse)
+            else:
+                # Trier par le libellé de la ligne
+                # Essayer d'abord un tri numérique, sinon alphabétique
+                def sort_key(r):
+                    label = r['row']
+                    if label is None:
+                        return (1, '')  # Les None à la fin
+                    # Essayer de convertir en nombre pour tri numérique
+                    try:
+                        return (0, float(str(label).replace(',', '.').replace(' ', '')))
+                    except (ValueError, AttributeError):
+                        # Si ce n'est pas un nombre, tri alphabétique insensible à la casse
+                        return (1, str(label).lower())
+                
+                data_rows.sort(key=sort_key, reverse=reverse)
+            
+            _logger.info("[TDB PIVOT 1D SORT] Lignes après tri: %s", [(r['row'], r['value']) for r in data_rows[:5]])
 
         _logger.debug("[TDB] pivot rows=%s", len(data_rows))
         return {
