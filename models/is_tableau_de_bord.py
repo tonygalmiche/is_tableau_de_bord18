@@ -270,17 +270,29 @@ class IsTableauDeBordLine(models.Model):
                         graph_mode = context['graph_mode']
                         self.graph_chart_type = graph_mode if graph_mode in ['bar', 'line', 'pie'] else 'bar'
                     
-                    # Récupérer graph_measure
+                    # Récupérer graph_measure ou pivot_measures
                     if 'graph_measure' in context:
                         self.graph_measure = context['graph_measure']
+                    elif 'pivot_measures' in context:
+                        measures = context['pivot_measures']
+                        if isinstance(measures, list) and measures:
+                            self.graph_measure = measures[0]
+                        else:
+                            self.graph_measure = str(measures)
                     
-                    # Récupérer graph_groupbys (liste)
+                    # Récupérer graph_groupbys ou pivot_row_groupby (liste)
                     if 'graph_groupbys' in context:
                         groupbys = context['graph_groupbys']
                         if isinstance(groupbys, list):
                             self.graph_groupbys = ','.join(groupbys)
                         else:
                             self.graph_groupbys = str(groupbys)
+                    elif 'pivot_row_groupby' in context:
+                        row_groupby = context['pivot_row_groupby']
+                        if isinstance(row_groupby, list):
+                            self.graph_groupbys = ','.join(row_groupby)
+                        else:
+                            self.graph_groupbys = str(row_groupby)
                 
                 # Pour les pivots
                 elif self.display_mode == 'pivot' and isinstance(context, dict):
@@ -446,15 +458,29 @@ class IsTableauDeBordLine(models.Model):
                 if graph_mode in ['bar', 'line', 'pie']:
                     result['graph_chart_type'] = graph_mode
             
+            # Récupérer graph_measure (priorité) sinon pivot_measures
             if 'graph_measure' in context:
                 result['graph_measure'] = context['graph_measure']
+            elif 'pivot_measures' in context:
+                measures = context['pivot_measures']
+                if isinstance(measures, list) and measures:
+                    result['graph_measure'] = measures[0]
+                else:
+                    result['graph_measure'] = str(measures)
             
+            # Récupérer graph_groupbys (priorité) sinon pivot_row_groupby
             if 'graph_groupbys' in context:
                 groupbys = context['graph_groupbys']
                 if isinstance(groupbys, list):
                     result['graph_groupbys'] = ','.join(groupbys)
                 else:
                     result['graph_groupbys'] = str(groupbys)
+            elif 'pivot_row_groupby' in context:
+                row_groupby = context['pivot_row_groupby']
+                if isinstance(row_groupby, list):
+                    result['graph_groupbys'] = ','.join(row_groupby)
+                else:
+                    result['graph_groupbys'] = str(row_groupby)
             
             return result
             
