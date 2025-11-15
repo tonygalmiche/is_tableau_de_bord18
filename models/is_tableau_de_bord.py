@@ -124,6 +124,8 @@ class IsTableauDeBordLine(models.Model):
         ('6', 'Demi largeur'),
         ('4', 'Tiers de largeur'),
         ('3', 'Quart de largeur'),
+        ('20', 'Cinquième de largeur'),
+        ('2', 'Sixième de largeur'),
     ], string='Largeur', default='6')
     
     height = fields.Selection([

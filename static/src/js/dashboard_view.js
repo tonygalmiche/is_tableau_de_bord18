@@ -100,7 +100,7 @@ export class DashboardFormController extends FormController {
                             </div>
                             <div class="d-flex gap-2">
                                 <a href="#" class="btn btn-sm btn-outline-primary open-filter-link" data-line-id="${serverLineId}" title="Ouvrir la recherche complète en plein écran">
-                                    <i class="fa fa-expand"></i> Plein écran
+                                    <i class="fa fa-expand"></i>
                                 </a>
                                 ${editButtons}
                             </div>
