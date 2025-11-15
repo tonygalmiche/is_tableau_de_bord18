@@ -102,7 +102,7 @@ class TableauDeBordController(http.Controller):
             # Appliquer aussi d'éventuels overrides envoyés côté client (sécurisé au scope utilisateur)
             if isinstance(overrides, dict):
                 safe_keys = {
-                    'search_default_view_type', 'graph_chart_type', 'graph_aggregator', 'graph_show_legend', 'show_data_title',
+                    'search_default_view_type', 'graph_chart_type', 'graph_aggregator', 'graph_show_legend', 'show_data_title', 'show_record_count',
                     'pivot_row_groupby', 'pivot_column_groupby', 'pivot_measures',
                     'pivot_sort_by', 'pivot_sort_order',
                     'graph_groupbys', 'graph_measure', 'list_fields', 'measure', 'group_by'
@@ -150,10 +150,14 @@ class TableauDeBordController(http.Controller):
 
     def _get_list_data(self, model, filter_obj, domain, context, line=None):
         """Génère les données pour une vue liste"""
-        # Déterminer la limite
+        # Déterminer la limite et show_record_count
         limit = 50  # Valeur par défaut
+        show_record_count = context.get('show_record_count', True)
+        
         if line and hasattr(line, 'limit') and line.limit > 0:
             limit = line.limit
+        if line and hasattr(line, 'show_record_count'):
+            show_record_count = line.show_record_count
         
         # 1) Priorité 1: Champs configurés dans la ligne du tableau de bord (field_ids)
         line_id = context.get('line_id')
@@ -216,13 +220,21 @@ class TableauDeBordController(http.Controller):
 
         fields_meta = [{'name': f, 'string': field_labels.get(f, f)} for f in fields_to_display]
 
-        return {
+        result = {
             'type': 'list',
             'data': data,
             'fields': fields_meta,
-            'count': model.search_count(domain),
             'model': filter_obj.model_id,
         }
+        
+        # Ajouter le compteur seulement si show_record_count est True
+        if show_record_count:
+            result['count'] = model.search_count(domain)
+            result['show_record_count'] = True
+        else:
+            result['show_record_count'] = False
+        
+        return result
 
     def _get_graph_data(self, model, filter_obj, domain, context, line=None):
         """Génère les données pour un graphique simple"""

@@ -274,6 +274,7 @@ export class DashboardFormController extends FormController {
                     graph_aggregator: line.graph_aggregator,
                     graph_show_legend: line.graph_show_legend,
                     show_data_title: line.show_data_title,
+                    show_record_count: line.show_record_count,
                     pivot_row_groupby: line.pivot_row_groupby,
                     pivot_column_groupby: line.pivot_col_groupby,
                     pivot_measures: line.pivot_measure,
@@ -374,7 +375,11 @@ export class DashboardFormController extends FormController {
         html += '</tbody>';
         
         html += `</table></div>`;
-        html += `<div class="text-muted small p-2 border-top">Total: ${data.count} enregistrement(s)</div>`;
+        
+        // Afficher le compteur seulement si show_record_count est True
+        if (data.show_record_count !== false && data.count !== undefined) {
+            html += `<div class="text-muted small p-2 border-top">Total: ${data.count} enregistrement(s)</div>`;
+        }
         
         container.innerHTML = html;
         container.className = "dashboard-item h-100 d-flex flex-column";

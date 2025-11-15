@@ -40,6 +40,8 @@
                                 <field name="pivot_sort_order" optional="hide"/>
                                 <field name="pivot_show_row_totals" optional="hide"/>
                                 <field name="pivot_show_col_totals" optional="hide"/>
+                                <field name="show_data_title" optional="hide"/>
+                                <field name="show_record_count" optional="hide"/>
                                 <field name="limit" optional="hide"/>
                             </list>
                         </field>
@@ -89,6 +91,9 @@
                         <field name="pivot_sort_order"/>
                         <field name="pivot_show_row_totals"/>
                         <field name="pivot_show_col_totals"/>
+                    </group>
+                    <group invisible="display_mode != 'list'">
+                        <field name="show_record_count"/>
                     </group>
                     <group invisible="display_mode != 'list'">
                         <field name="field_ids">
@@ -189,6 +194,7 @@
                                 <field name="pivot_sort_order"/>
                                 <field name="pivot_show_row_totals"/>
                                 <field name="pivot_show_col_totals"/>
+                                <field name="show_record_count"/>
                             </list>
                         </field>
                     </div>
