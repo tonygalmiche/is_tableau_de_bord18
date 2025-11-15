@@ -169,6 +169,7 @@ class IsTableauDeBordLine(models.Model):
         ('asc', 'Tri croissant'),
         ('desc', 'Tri décroissant'),
     ], string='Ordre du tri', default='asc', help='Ordre de tri pour le tableau croisé')
+    limit = fields.Integer('Limite', default=0, help='Nombre maximum de lignes à afficher (0 = toutes les lignes)')
     filter_domain     = fields.Char(compute='_compute_filter_domain', store=False)
     field_ids         = fields.One2many('is.tableau.de.bord.line.field', 'line_id', string='Champs de la liste')
     model_ids         = fields.Many2many('ir.model', compute='_compute_model_ids', store=False, compute_sudo=True)

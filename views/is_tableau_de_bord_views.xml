@@ -37,6 +37,7 @@
                                 <field name="pivot_measure" optional="hide"/>
                                 <field name="pivot_sort_by" optional="hide"/>
                                 <field name="pivot_sort_order" optional="hide"/>
+                                <field name="limit" optional="hide"/>
                             </list>
                         </field>
                     </group>
@@ -70,6 +71,7 @@
                     </group>
                     <group string="Configuration de l'affichage">
                         <field name="display_mode"/>
+                        <field name="limit"/>
                     </group>
                     <group invisible="display_mode != 'graph'">
                         <field name="graph_chart_type"/>

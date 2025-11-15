@@ -470,13 +470,12 @@ export class DashboardFormController extends FormController {
 
     formatNumber(value) {
         if (value === null || value === undefined) return '0';
-        // Formater avec séparateur de milliers et 2 décimales si nécessaire
+        // Formater avec séparateur de milliers en nombres entiers uniquement
         const num = parseFloat(value);
         if (isNaN(num)) return value;
-        if (Number.isInteger(num)) {
-            return num.toLocaleString('fr-FR');
-        }
-        return num.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        // Arrondir à l'entier le plus proche
+        const rounded = Math.round(num);
+        return rounded.toLocaleString('fr-FR');
     }
 
     renderPivotData(container, data) {

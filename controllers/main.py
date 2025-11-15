@@ -58,6 +58,8 @@ class TableauDeBordController(http.Controller):
             if line_id:
                 ctx['line_id'] = line_id
 
+            # Récupérer la ligne pour accéder à ses paramètres (notamment limit)
+            line = None
             # Appliquer overrides éventuels de la ligne (sur ctx)
             # Ces overrides peuvent SURCHARGER le contexte du filtre si définis dans la ligne
             if line_id:
@@ -121,11 +123,11 @@ class TableauDeBordController(http.Controller):
 
             model = model.with_context(ctx)
             if view_type == 'graph':
-                return self._get_graph_data(model, filter_obj, domain, ctx)
+                return self._get_graph_data(model, filter_obj, domain, ctx, line)
             elif view_type == 'pivot':
-                return self._get_pivot_data(model, filter_obj, domain, ctx)
+                return self._get_pivot_data(model, filter_obj, domain, ctx, line)
             else:
-                return self._get_list_data(model, filter_obj, domain, ctx)
+                return self._get_list_data(model, filter_obj, domain, ctx, line)
 
         except Exception as e:
             _logger.exception("[TDB] get_filter_data error: %s", e)
@@ -152,8 +154,13 @@ class TableauDeBordController(http.Controller):
         # Par défaut: liste
         return 'list'
 
-    def _get_list_data(self, model, filter_obj, domain, context):
+    def _get_list_data(self, model, filter_obj, domain, context, line=None):
         """Génère les données pour une vue liste"""
+        # Déterminer la limite
+        limit = 50  # Valeur par défaut
+        if line and hasattr(line, 'limit') and line.limit > 0:
+            limit = line.limit
+        
         # 1) Priorité 1: Champs configurés dans la ligne du tableau de bord (field_ids)
         line_id = context.get('line_id')
         explicit_fields = []
@@ -213,7 +220,7 @@ class TableauDeBordController(http.Controller):
             fields_to_display, field_labels = self._get_fields_from_view(model, 'list', view_id=view_id)
         _logger.info("[TDB] list fields=%s (view_id=%s)", fields_to_display, view_id)
 
-        recs = model.search(domain, limit=50)
+        recs = model.search(domain, limit=limit)
         data = recs.read(fields_to_display) if recs else []
 
         fields_meta = [{'name': f, 'string': field_labels.get(f, f)} for f in fields_to_display]
@@ -226,8 +233,13 @@ class TableauDeBordController(http.Controller):
             'model': filter_obj.model_id,
         }
 
-    def _get_graph_data(self, model, filter_obj, domain, context):
+    def _get_graph_data(self, model, filter_obj, domain, context, line=None):
         """Génère les données pour un graphique simple"""
+        # Déterminer la limite (pour les read_group, la limite s'applique sur les groupes)
+        limit = None  # Pas de limite par défaut pour les graphiques
+        if line and hasattr(line, 'limit') and line.limit > 0:
+            limit = line.limit
+        
         groupbys = context.get('graph_groupbys') or context.get('group_by') or []
         _logger.info("[TDB GRAPH] >>> Contexte complet: %s", context)
         _logger.info("[TDB GRAPH] >>> groupbys brut: %s (type: %s)", groupbys, type(groupbys))
@@ -255,8 +267,8 @@ class TableauDeBordController(http.Controller):
             agg_label = f"{aggregator} de {measure}"
 
         try:
-            _logger.info("[TDB GRAPH] >>> Appel read_group avec domain=%s fields=%s groupby=%s", domain, fields, groupbys)
-            results = model.read_group(domain, fields=fields, groupby=groupbys, lazy=False)
+            _logger.info("[TDB GRAPH] >>> Appel read_group avec domain=%s fields=%s groupby=%s limit=%s", domain, fields, groupbys, limit)
+            results = model.read_group(domain, fields=fields, groupby=groupbys, lazy=False, limit=limit)
             _logger.info("[TDB GRAPH] >>> read_group retourne %s résultats", len(results))
             for i, r in enumerate(results):
                 _logger.info("[TDB GRAPH] >>> Résultat %s: %s", i, r)
@@ -311,9 +323,14 @@ class TableauDeBordController(http.Controller):
         _logger.info("[TDB GRAPH] >>> Résultat final: %s", result)
         return result
 
-    def _get_pivot_data(self, model, filter_obj, domain, context):
+    def _get_pivot_data(self, model, filter_obj, domain, context, line=None):
         """Génère les données pour un tableau croisé; support 1D (lignes) et 2D (lignes x colonnes).
         Utilise les informations du contexte du filtre pour respecter les paramètres de la vue pivot standard."""
+        
+        # Déterminer la limite
+        limit = None  # Pas de limite par défaut pour les pivots
+        if line and hasattr(line, 'limit') and line.limit > 0:
+            limit = line.limit
         
         # Récupérer les groupements et mesures depuis le contexte (priorité au contexte du filtre)
         row_gb = context.get('pivot_row_groupby') or context.get('graph_groupbys') or context.get('group_by')
@@ -368,6 +385,7 @@ class TableauDeBordController(http.Controller):
 
         if row_gb and col_gb:
             # 2D pivot
+            # Ne pas appliquer la limite au read_group, on triera et limitera après
             try:
                 results = model.read_group(domain, fields=fields or ["__count"], groupby=[row_gb, col_gb], lazy=False)
             except Exception:
@@ -465,6 +483,11 @@ class TableauDeBordController(http.Controller):
             
             _logger.info("[TDB PIVOT SORT] Lignes après tri: %s", [(r['row'], sum(r['values'])) for r in rows[:5]])
             
+            # Appliquer la limite APRÈS le tri
+            if limit and limit > 0:
+                _logger.info("[TDB PIVOT SORT] Application de la limite: %s lignes -> %s lignes", len(rows), limit)
+                rows = rows[:limit]
+            
             # sort columns by label for stability
             columns = [{'key': i, 'label': lbl} for i, lbl in enumerate(col_labels)]
             return {
@@ -491,6 +514,7 @@ class TableauDeBordController(http.Controller):
             if row_field_info.get('type') == 'selection' and row_field_info.get('selection'):
                 row_selection_map = dict(row_field_info['selection'])
             
+            # Ne pas appliquer la limite au read_group, on triera et limitera après
             try:
                 results = model.read_group(domain, fields=fields or ["__count"], groupby=[row_gb], lazy=False)
                 for r in results:
@@ -553,6 +577,11 @@ class TableauDeBordController(http.Controller):
                 data_rows.sort(key=sort_key, reverse=reverse)
             
             _logger.info("[TDB PIVOT 1D SORT] Lignes après tri: %s", [(r['row'], r['value']) for r in data_rows[:5]])
+            
+            # Appliquer la limite APRÈS le tri
+            if limit and limit > 0:
+                _logger.info("[TDB PIVOT 1D SORT] Application de la limite: %s lignes -> %s lignes", len(data_rows), limit)
+                data_rows = data_rows[:limit]
 
         _logger.debug("[TDB] pivot rows=%s", len(data_rows))
         return {
