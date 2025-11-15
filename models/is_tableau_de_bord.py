@@ -169,6 +169,8 @@ class IsTableauDeBordLine(models.Model):
         ('asc', 'Tri croissant'),
         ('desc', 'Tri décroissant'),
     ], string='Ordre du tri', default='asc', help='Ordre de tri pour le tableau croisé')
+    pivot_show_row_totals = fields.Boolean('Afficher les totaux des lignes', default=True, help='Ajouter une colonne de total pour chaque ligne')
+    pivot_show_col_totals = fields.Boolean('Afficher les totaux des colonnes', default=True, help='Ajouter une ligne de total pour chaque colonne')
     limit = fields.Integer('Limite', default=0, help='Nombre maximum de lignes à afficher (0 = toutes les lignes)')
     filter_domain     = fields.Char(compute='_compute_filter_domain', store=False)
     field_ids         = fields.One2many('is.tableau.de.bord.line.field', 'line_id', string='Champs de la liste')

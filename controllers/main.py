@@ -96,6 +96,11 @@ class TableauDeBordController(http.Controller):
                             ctx['pivot_sort_by'] = line.pivot_sort_by
                         if line.pivot_sort_order:
                             ctx['pivot_sort_order'] = line.pivot_sort_order
+                        # Ajouter les paramètres d'affichage des totaux
+                        if hasattr(line, 'pivot_show_row_totals'):
+                            ctx['pivot_show_row_totals'] = line.pivot_show_row_totals
+                        if hasattr(line, 'pivot_show_col_totals'):
+                            ctx['pivot_show_col_totals'] = line.pivot_show_col_totals
                         _logger.info("[TDB] Overrides depuis la ligne appliqués: graph_measure=%s graph_groupbys=%s", 
                                    line.graph_measure, line.graph_groupbys)
                 except Exception as e:
@@ -519,9 +524,27 @@ class TableauDeBordController(http.Controller):
             # Trier et limiter
             rows = self._sort_and_limit_rows(rows, context, limit, is_2d=True)
             
+            # Calculer les totaux si demandé
+            show_row_totals = context.get('pivot_show_row_totals', True)
+            show_col_totals = context.get('pivot_show_col_totals', True)
+            
+            col_totals = None
+            if show_col_totals and rows:
+                # Calculer le total de chaque colonne
+                col_totals = [0] * len(col_labels)
+                for row in rows:
+                    for i, val in enumerate(row['values']):
+                        col_totals[i] += val
+            
+            # Ajouter le total de ligne à chaque ligne si demandé
+            if show_row_totals:
+                for row in rows:
+                    row['row_total'] = sum(row['values'])
+            
             # sort columns by label for stability
             columns = [{'key': i, 'label': lbl} for i, lbl in enumerate(col_labels)]
-            return {
+            
+            result = {
                 'type': 'pivot',
                 'data': {
                     'columns': columns,
@@ -531,6 +554,15 @@ class TableauDeBordController(http.Controller):
                     'col_label': col_label,
                 },
             }
+            
+            # Ajouter les totaux au résultat
+            if show_col_totals and col_totals is not None:
+                result['data']['col_totals'] = col_totals
+                if show_row_totals:
+                    # Ajouter aussi le grand total (total des totaux)
+                    result['data']['grand_total'] = sum(col_totals)
+            
+            return result
 
         # 1D pivot (lignes uniquement)
         data_rows = []
@@ -566,12 +598,22 @@ class TableauDeBordController(http.Controller):
             data_rows = self._sort_and_limit_rows(data_rows, context, limit, is_2d=False)
 
         _logger.debug("[TDB] pivot rows=%s", len(data_rows))
-        return {
+        
+        # Calculer le total général pour les pivots 1D si demandé
+        show_col_totals = context.get('pivot_show_col_totals', True)
+        result = {
             'type': 'pivot',
             'data': data_rows,
             'measure_label': measure_label,
             'row_label': row_label,
         }
+        
+        # Ajouter le total si demandé et si ce n'est pas déjà un total unique
+        if show_col_totals and data_rows and not (len(data_rows) == 1 and data_rows[0]['row'] == 'Total'):
+            total_value = sum(row['value'] for row in data_rows)
+            result['total'] = total_value
+        
+        return result
 
     def _get_fields_from_view(self, model, view_type, view_id=None):
         """Récupère les champs et leurs libellés depuis la vue list/tree.

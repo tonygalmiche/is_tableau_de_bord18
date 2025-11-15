@@ -487,6 +487,10 @@ export class DashboardFormController extends FormController {
             const measureLabel = data.data.measure_label || 'Total';
             const rowLabel = data.data.row_label || 'Lignes';
             const colLabel = data.data.col_label || 'Colonnes';
+            const colTotals = data.data.col_totals || null;
+            const grandTotal = data.data.grand_total || null;
+            const showRowTotals = rows.length > 0 && rows[0].hasOwnProperty('row_total');
+            const showColTotals = colTotals !== null;
             
             let html = '<div class="h-100 d-flex flex-column">';
             html += '<div class="px-2 pt-2"><small class="text-muted">Mesure: <strong>' + measureLabel + '</strong></small></div>';
@@ -496,31 +500,45 @@ export class DashboardFormController extends FormController {
             html += '<thead class="table-light"><tr>';
             html += '<th class="border-end" style="background-color: #f8f9fa;">' + rowLabel + '</th>';
             for (const c of cols) html += '<th class="text-end">' + c.label + '</th>';
-            html += '<th class="text-end border-start fw-bold" style="background-color: #e9ecef;">Total</th></tr></thead>';
+            if (showRowTotals) {
+                html += '<th class="text-end border-start fw-bold" style="background-color: #e9ecef;">Total</th>';
+            }
+            html += '</tr></thead>';
             
             // body
             html += '<tbody>';
             for (const r of rows) {
-                const total = (r.values || []).reduce((a, b) => a + (b || 0), 0);
                 html += '<tr><td class="border-end fw-bold" style="background-color: #fafbfc;">' + r.row + '</td>';
                 for (const v of (r.values || [])) {
                     const formattedValue = this.formatNumber(v);
                     html += '<td class="text-end">' + formattedValue + '</td>';
                 }
-                const formattedTotal = this.formatNumber(total);
-                html += '<td class="text-end border-start fw-bold" style="background-color: #f8f9fa;">' + formattedTotal + '</td></tr>';
+                if (showRowTotals) {
+                    const total = r.row_total !== undefined ? r.row_total : (r.values || []).reduce((a, b) => a + (b || 0), 0);
+                    const formattedTotal = this.formatNumber(total);
+                    html += '<td class="text-end border-start fw-bold" style="background-color: #f8f9fa;">' + formattedTotal + '</td>';
+                }
+                html += '</tr>';
             }
             
             // footer totals by column
-            const colTotals = cols.map((_, i) => rows.reduce((a, r) => a + (r.values?.[i] || 0), 0));
-            const grand = colTotals.reduce((a, b) => a + b, 0);
-            html += '<tr class="table-secondary border-top border-2"><td class="border-end fw-bold">Total</td>';
-            for (const t of colTotals) {
-                const formattedValue = this.formatNumber(t);
-                html += '<td class="text-end fw-bold">' + formattedValue + '</td>';
+            if (showColTotals) {
+                html += '<tr class="table-secondary border-top border-2"><td class="border-end fw-bold">Total</td>';
+                for (const t of colTotals) {
+                    const formattedValue = this.formatNumber(t);
+                    html += '<td class="text-end fw-bold">' + formattedValue + '</td>';
+                }
+                if (showRowTotals && grandTotal !== null) {
+                    const formattedGrand = this.formatNumber(grandTotal);
+                    html += '<td class="text-end border-start fw-bold">' + formattedGrand + '</td>';
+                } else if (showRowTotals) {
+                    // Calculer le grand total si pas fourni
+                    const grand = colTotals.reduce((a, b) => a + b, 0);
+                    const formattedGrand = this.formatNumber(grand);
+                    html += '<td class="text-end border-start fw-bold">' + formattedGrand + '</td>';
+                }
+                html += '</tr>';
             }
-            const formattedGrand = this.formatNumber(grand);
-            html += '<td class="text-end border-start fw-bold">' + formattedGrand + '</td></tr>';
             html += '</tbody></table></div></div>';
             container.innerHTML = html;
             container.className = "dashboard-item h-100";
@@ -530,6 +548,7 @@ export class DashboardFormController extends FormController {
         // 1D list fallback avec libellés améliorés
         const measureLabel = data.measure_label || 'Valeur';
         const rowLabel = data.row_label || 'Lignes';
+        const showTotal = data.total !== undefined;
         
         let html = '<div class="h-100 d-flex flex-column">';
         html += '<div class="px-2 pt-2"><small class="text-muted">Mesure: <strong>' + measureLabel + '</strong></small></div>';
@@ -537,16 +556,14 @@ export class DashboardFormController extends FormController {
         html += '<thead class="table-light"><tr><th>' + rowLabel + '</th><th class="text-end">' + measureLabel + '</th></tr></thead>';
         html += '<tbody>';
         
-        let total = 0;
         for (const row of (data.data || [])) {
             const formattedValue = this.formatNumber(row.value);
             html += '<tr><td>' + row.row + '</td><td class="text-end fw-bold">' + formattedValue + '</td></tr>';
-            total += (row.value || 0);
         }
         
-        // Ajouter une ligne de total si plusieurs lignes
-        if (data.data && data.data.length > 1) {
-            const formattedTotal = this.formatNumber(total);
+        // Ajouter une ligne de total UNIQUEMENT si fourni par le backend
+        if (showTotal) {
+            const formattedTotal = this.formatNumber(data.total);
             html += '<tr class="table-secondary border-top border-2"><td class="fw-bold">Total</td><td class="text-end fw-bold">' + formattedTotal + '</td></tr>';
         }
         
