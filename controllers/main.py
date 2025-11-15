@@ -75,6 +75,8 @@ class TableauDeBordController(http.Controller):
                             ctx['graph_measure'] = line.graph_measure
                         if line.graph_groupbys:
                             ctx['graph_groupbys'] = line.graph_groupbys
+                        # Toujours passer graph_show_legend (avec valeur par défaut True)
+                        ctx['graph_show_legend'] = line.graph_show_legend if hasattr(line, 'graph_show_legend') else True
                         if line.pivot_row_groupby:
                             # Convertir la chaîne en liste si nécessaire
                             ctx['pivot_row_groupby'] = [g.strip() for g in line.pivot_row_groupby.split(',')] if ',' in line.pivot_row_groupby else [line.pivot_row_groupby]
@@ -100,7 +102,7 @@ class TableauDeBordController(http.Controller):
             # Appliquer aussi d'éventuels overrides envoyés côté client (sécurisé au scope utilisateur)
             if isinstance(overrides, dict):
                 safe_keys = {
-                    'search_default_view_type', 'graph_chart_type', 'graph_aggregator',
+                    'search_default_view_type', 'graph_chart_type', 'graph_aggregator', 'graph_show_legend',
                     'pivot_row_groupby', 'pivot_column_groupby', 'pivot_measures',
                     'pivot_sort_by', 'pivot_sort_order',
                     'graph_groupbys', 'graph_measure', 'list_fields', 'measure', 'group_by'
@@ -248,6 +250,7 @@ class TableauDeBordController(http.Controller):
         measure = context.get('graph_measure') or context.get('measure')
         aggregator = context.get('graph_aggregator') or 'sum'
         chart_type = context.get('graph_chart_type') or 'bar'
+        show_legend = context.get('graph_show_legend', True)
 
         agg_label = "Nombre d'enregistrements"
         use_count = not measure or str(measure) in ('count', '__count')
@@ -308,6 +311,7 @@ class TableauDeBordController(http.Controller):
         result = {
             'type': 'graph',
             'chart_type': chart_type,
+            'show_legend': show_legend,
             'data': {
                 'labels': labels,
                 'datasets': [{

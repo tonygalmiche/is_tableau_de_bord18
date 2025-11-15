@@ -267,6 +267,7 @@ export class DashboardFormController extends FormController {
                     display_mode: line.display_mode,
                     graph_chart_type: line.graph_chart_type,
                     graph_aggregator: line.graph_aggregator,
+                    graph_show_legend: line.graph_show_legend,
                     pivot_row_groupby: line.pivot_row_groupby,
                     pivot_column_groupby: line.pivot_col_groupby,
                     pivot_measures: line.pivot_measure,
@@ -397,6 +398,7 @@ export class DashboardFormController extends FormController {
         // Si Chart global est disponible (injecté par Odoo web), dessiner; sinon fallback texte
     const el = document.getElementById(chartId);
     if (window.Chart && el) {
+            const showLegend = data.show_legend !== undefined ? data.show_legend : true;
             new window.Chart(el.getContext('2d'), {
                 type: data.chart_type || 'bar',
                 data: {
@@ -411,7 +413,7 @@ export class DashboardFormController extends FormController {
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
+                    plugins: { legend: { display: showLegend } },
                     scales: { y: { beginAtZero: true } }
                 }
             });

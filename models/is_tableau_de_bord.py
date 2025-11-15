@@ -156,6 +156,7 @@ class IsTableauDeBordLine(models.Model):
     
     graph_measure = fields.Char('Graph: Mesure', help='Champ utilisé pour la mesure du graphique')
     graph_groupbys = fields.Char('Graph: Groupements', help='Liste des groupements pour le graphique (ex: invoice_date:year)')
+    graph_show_legend = fields.Boolean('Afficher la légende', default=True, help='Afficher ou masquer la légende du graphique')
 
     pivot_row_groupby = fields.Char('Pivot: Groupe lignes')
     pivot_col_groupby = fields.Char('Pivot: Groupe colonnes')

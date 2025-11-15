@@ -32,6 +32,7 @@
                                 <field name="display_mode" optional="show"/>
                                 <field name="graph_chart_type" optional="hide"/>
                                 <field name="graph_aggregator" optional="hide"/>
+                                <field name="graph_show_legend" optional="hide"/>
                                 <field name="pivot_row_groupby" optional="hide"/>
                                 <field name="pivot_col_groupby" optional="hide"/>
                                 <field name="pivot_measure" optional="hide"/>
@@ -77,6 +78,7 @@
                     </group>
                     <group invisible="display_mode != 'graph'">
                         <field name="graph_chart_type"/>
+                        <field name="graph_show_legend"/>
                         <field name="pivot_sort_by"/>
                         <field name="pivot_sort_order"/>
                     </group>
@@ -176,6 +178,7 @@
                                 <field name="display_mode"/>
                                 <field name="graph_chart_type"/>
                                 <field name="graph_groupbys"/>
+                                <field name="graph_show_legend"/>
                                 <field name="pivot_row_groupby"/>
                                 <field name="pivot_col_groupby"/>
                                 <field name="pivot_measure"/>
