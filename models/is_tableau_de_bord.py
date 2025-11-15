@@ -164,11 +164,11 @@ class IsTableauDeBordLine(models.Model):
     pivot_sort_by = fields.Selection([
         ('row', 'Tri des lignes'),
         ('total', 'Tri des totaux'),
-    ], string='Tri par', default='row', help='Critère de tri pour le tableau croisé')
+    ], string='Tri par', default='row', help='Critère de tri (graphique: label=row, value=total)')
     pivot_sort_order = fields.Selection([
         ('asc', 'Tri croissant'),
         ('desc', 'Tri décroissant'),
-    ], string='Ordre du tri', default='asc', help='Ordre de tri pour le tableau croisé')
+    ], string='Ordre du tri', default='asc', help='Ordre de tri (pivot et graphique)')
     pivot_show_row_totals = fields.Boolean('Afficher les totaux des lignes', default=True, help='Ajouter une colonne de total pour chaque ligne')
     pivot_show_col_totals = fields.Boolean('Afficher les totaux des colonnes', default=True, help='Ajouter une ligne de total pour chaque colonne')
     limit = fields.Integer('Limite', default=0, help='Nombre maximum de lignes à afficher (0 = toutes les lignes)')

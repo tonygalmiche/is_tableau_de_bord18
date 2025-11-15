@@ -240,10 +240,17 @@ class TableauDeBordController(http.Controller):
 
     def _get_graph_data(self, model, filter_obj, domain, context, line=None):
         """Génère les données pour un graphique simple"""
-        # Déterminer la limite (pour les read_group, la limite s'applique sur les groupes)
-        limit = None  # Pas de limite par défaut pour les graphiques
+        # Déterminer la limite et le tri
+        limit = None
+        sort_by = 'row'  # Par défaut tri par libellé (équivalent à 'row' pour les pivots)
+        sort_order = 'asc'
+        
         if line and hasattr(line, 'limit') and line.limit > 0:
             limit = line.limit
+        if line and hasattr(line, 'pivot_sort_by') and line.pivot_sort_by:
+            sort_by = line.pivot_sort_by  # 'row' = tri par libellé, 'total' = tri par valeur
+        if line and hasattr(line, 'pivot_sort_order') and line.pivot_sort_order:
+            sort_order = line.pivot_sort_order
         
         groupbys = context.get('graph_groupbys') or context.get('group_by') or []
         _logger.info("[TDB GRAPH] >>> Contexte complet: %s", context)
@@ -272,17 +279,16 @@ class TableauDeBordController(http.Controller):
             agg_label = f"{aggregator} de {measure}"
 
         try:
-            _logger.info("[TDB GRAPH] >>> Appel read_group avec domain=%s fields=%s groupby=%s limit=%s", domain, fields, groupbys, limit)
-            results = model.read_group(domain, fields=fields, groupby=groupbys, lazy=False, limit=limit)
+            # NE PAS appliquer limit dans read_group (on le fera après le tri)
+            _logger.info("[TDB GRAPH] >>> Appel read_group avec domain=%s fields=%s groupby=%s (sans limit)", domain, fields, groupbys)
+            results = model.read_group(domain, fields=fields, groupby=groupbys, lazy=False)
             _logger.info("[TDB GRAPH] >>> read_group retourne %s résultats", len(results))
-            for i, r in enumerate(results):
-                _logger.info("[TDB GRAPH] >>> Résultat %s: %s", i, r)
         except Exception as e:
             _logger.exception("[TDB GRAPH] >>> Erreur read_group: %s", e)
             results = []
 
-        labels = []
-        values = []
+        # Construire les labels et valeurs
+        data_list = []
         if results:
             for r in results:
                 label_parts = []
@@ -292,18 +298,41 @@ class TableauDeBordController(http.Controller):
                     _logger.info("[TDB GRAPH] >>> Extraction label pour groupby=%s: base=%s val=%s", gb, base, val)
                     label_parts.append(str(val) if val is not None else '')
                 label = " / ".join([p for p in label_parts if p])
-                labels.append(label)
                 
                 if use_count:
                     value = r.get("__count") or 0
                 else:
                     value = r.get(f"{measure}_{aggregator}") or r.get(measure) or 0
-                values.append(value)
+                
+                data_list.append({'label': label, 'value': value})
                 _logger.info("[TDB GRAPH] >>> Label: %s -> Valeur: %s", label, value)
         else:
             _logger.info("[TDB GRAPH] >>> Pas de résultats, utilisation du count total")
-            labels = ['Total']
-            values = [model.search_count(domain)]
+            total_count = model.search_count(domain)
+            data_list = [{'label': 'Total', 'value': total_count}]
+
+        # Appliquer le tri et la limite
+        _logger.info("[TDB GRAPH] >>> Avant tri: %s éléments", len(data_list))
+        
+        if sort_by == 'total':
+            # Tri par valeur
+            reverse = (sort_order == 'desc')
+            data_list.sort(key=lambda x: x['value'], reverse=reverse)
+            _logger.info("[TDB GRAPH] >>> Tri par valeur (%s)", sort_order)
+        else:
+            # Tri par libellé (smart key)
+            reverse = (sort_order == 'desc')
+            data_list.sort(key=lambda x: self._sort_key_smart(x['label']), reverse=reverse)
+            _logger.info("[TDB GRAPH] >>> Tri par libellé (%s)", sort_order)
+        
+        # Appliquer la limite après le tri
+        if limit and limit > 0:
+            data_list = data_list[:limit]
+            _logger.info("[TDB GRAPH] >>> Après limite: %s éléments", len(data_list))
+        
+        # Extraire les labels et valeurs triés/limités
+        labels = [item['label'] for item in data_list]
+        values = [item['value'] for item in data_list]
 
         _logger.info("[TDB GRAPH] >>> Labels finaux: %s", labels)
         _logger.info("[TDB GRAPH] >>> Valeurs finales: %s", values)
