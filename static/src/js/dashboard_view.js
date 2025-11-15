@@ -377,12 +377,15 @@ export class DashboardFormController extends FormController {
     renderGraphData(container, data) {
         // Préparer un canvas pour dessiner un vrai graphique si Chart.js est dispo
         const chartId = `chart_${Math.random().toString(36).slice(2)}`;
-        let html = `<div class="p-2 h-100 d-flex flex-column">
-            <div class="d-flex align-items-center justify-content-between mb-2">
-                <h6 class="mb-0">${data.data?.datasets?.[0]?.label || 'Graphique'}</h6>
+        const isPieChart = (data.chart_type || 'bar') === 'pie';
+        const paddingClass = isPieChart ? 'p-1' : 'p-2';
+        const titleMargin = isPieChart ? 'mb-0' : 'mb-1';
+        let html = `<div class="${paddingClass} h-100 d-flex flex-column">
+            <div class="d-flex align-items-center justify-content-between ${titleMargin}">
+                <h6 class="mb-0 small">${data.data?.datasets?.[0]?.label || 'Graphique'}</h6>
             </div>
-            <div class="flex-grow-1 position-relative">
-                <canvas id="${chartId}" style="max-height: 100%;"></canvas>
+            <div class="flex-grow-1 position-relative" style="min-height: 0;">
+                <canvas id="${chartId}" style="max-height: 100%; max-width: 100%;"></canvas>
             </div>
         </div>`;
         container.innerHTML = html;
@@ -399,8 +402,40 @@ export class DashboardFormController extends FormController {
     const el = document.getElementById(chartId);
     if (window.Chart && el) {
             const showLegend = data.show_legend !== undefined ? data.show_legend : true;
+            const chartType = data.chart_type || 'bar';
+            const isPieChart = chartType === 'pie';
+            
+            // Options spécifiques selon le type de graphique
+            const chartOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                layout: {
+                    padding: isPieChart ? 2 : 10
+                },
+                plugins: {
+                    legend: {
+                        display: showLegend,
+                        position: isPieChart ? 'right' : 'top',
+                        labels: {
+                            boxWidth: isPieChart ? 10 : 40,
+                            padding: isPieChart ? 4 : 10,
+                            font: {
+                                size: isPieChart ? 9 : 12
+                            }
+                        }
+                    }
+                }
+            };
+            
+            // Ajouter les scales uniquement pour les graphiques bar et line
+            if (!isPieChart) {
+                chartOptions.scales = {
+                    y: { beginAtZero: true }
+                };
+            }
+            
             new window.Chart(el.getContext('2d'), {
-                type: data.chart_type || 'bar',
+                type: chartType,
                 data: {
                     labels,
                     datasets: [{
@@ -410,12 +445,7 @@ export class DashboardFormController extends FormController {
                         borderWidth: 1,
                     }]
                 },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: showLegend } },
-                    scales: { y: { beginAtZero: true } }
-                }
+                options: chartOptions
             });
         } else {
             // Fallback: valeurs en gros comme avant
