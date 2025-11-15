@@ -345,7 +345,7 @@ export class DashboardFormController extends FormController {
         html += '<thead><tr>';
         for (const f of validFields) {
             const label = typeof f === 'string' ? f : (f?.string || f?.name || 'Sans nom');
-            html += `<th>${label}</th>`;
+            html += `<th style="white-space: nowrap; font-size: 0.875rem; overflow: hidden; text-overflow: ellipsis; max-width: 200px; padding: 0.25rem 0.5rem;" title="${label}">${label}</th>`;
         }
         html += '</tr></thead>';
         
