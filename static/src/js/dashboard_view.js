@@ -100,8 +100,8 @@ export class DashboardFormController extends FormController {
                 <div class="col-md-${isNaN(widthCol) ? 6 : widthCol} mb-3">
                     <div class="card h-100">
                         <div class="card-header d-flex justify-content-between align-items-start">
-                            <div>
-                                <h5 class="card-title mb-0">${line.name || 'Sans nom'}</h5>
+                            <div style="min-width: 0; flex: 1;">
+                                <h5 class="card-title mb-0" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${line.name || 'Sans nom'}">${line.name || 'Sans nom'}</h5>
                             </div>
                             <div class="d-flex gap-2">
                                 <a href="#" class="btn btn-sm btn-outline-primary open-filter-link" data-line-id="${serverLineId}" title="Ouvrir la recherche complète en plein écran">
@@ -385,9 +385,10 @@ export class DashboardFormController extends FormController {
         const isPieChart = (data.chart_type || 'bar') === 'pie';
         const paddingClass = isPieChart ? 'p-1' : 'p-2';
         const titleMargin = isPieChart ? 'mb-0' : 'mb-1';
+        const graphTitle = data.data?.datasets?.[0]?.label || 'Graphique';
         let html = `<div class="${paddingClass} h-100 d-flex flex-column">
-            <div class="d-flex align-items-center justify-content-between ${titleMargin}">
-                <h6 class="mb-0 small">${data.data?.datasets?.[0]?.label || 'Graphique'}</h6>
+            <div class="${titleMargin}">
+                <h6 class="mb-0 small" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${graphTitle}">${graphTitle}</h6>
             </div>
             <div class="flex-grow-1 position-relative" style="min-height: 0;">
                 <canvas id="${chartId}" style="max-height: 100%; max-width: 100%;"></canvas>

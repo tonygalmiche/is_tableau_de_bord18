@@ -257,7 +257,25 @@ class TableauDeBordController(http.Controller):
         fields = [] if use_count else [f"{measure}:{aggregator}"]
         
         if not use_count:
-            agg_label = f"{aggregator} de {measure}"
+            # Traduire l'agrégateur
+            agg_translations = {
+                'sum': 'Somme',
+                'avg': 'Moyenne',
+                'max': 'Maximum',
+                'min': 'Minimum',
+                'count': 'Nombre',
+            }
+            agg_french = agg_translations.get(aggregator, aggregator)
+            
+            # Récupérer le nom traduit du champ
+            measure_field_name = measure
+            try:
+                field_info = model.fields_get([measure])
+                measure_field_name = field_info.get(measure, {}).get('string', measure)
+            except Exception:
+                pass
+            
+            agg_label = f"{agg_french} de {measure_field_name}"
 
         try:
             # NE PAS appliquer limit dans read_group (on le fera après le tri)
