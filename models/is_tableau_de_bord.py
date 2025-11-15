@@ -91,6 +91,19 @@ class IsTableauDeBord(models.Model):
         }
         return action
 
+    def action_refresh_all_lines_from_filters(self):
+        """Action pour rafraîchir toutes les lignes du tableau de bord depuis leurs filtres"""
+        self.ensure_one()
+        updated_count = 0
+        for line in self.line_ids:
+            if line.filter_id:
+                extracted = line._extract_filter_context_values(line.filter_id)
+                if extracted:
+                    print(f"[TDB DEBUG MODEL] Rafraîchissement ligne {line.id}: {line.name} - extracted: {extracted}")
+                    line.write(extracted)
+                    updated_count += 1
+        
+
 
 class IsTableauDeBordLine(models.Model):
     _name = 'is.tableau.de.bord.line'
@@ -273,15 +286,22 @@ class IsTableauDeBordLine(models.Model):
                         else:
                             self.pivot_row_groupby = str(row_groupby)
                     
-                    # Récupérer pivot_col_groupby
-                    if 'pivot_col_groupby' in context:
-                        col_groupby = context['pivot_col_groupby']
+                    # Récupérer pivot_column_groupby (la clé standard dans les favoris)
+                    if 'pivot_column_groupby' in context:
+                        col_groupby = context['pivot_column_groupby']
+                        print(f"[TDB DEBUG MODEL] pivot_column_groupby trouvé dans context: {col_groupby} (type: {type(col_groupby)})")
                         if isinstance(col_groupby, list):
                             self.pivot_col_groupby = ','.join(col_groupby)
                         else:
                             self.pivot_col_groupby = str(col_groupby)
+                        print(f"[TDB DEBUG MODEL] pivot_col_groupby défini à: {self.pivot_col_groupby}")
+                    else:
+                        print(f"[TDB DEBUG MODEL] pivot_column_groupby PAS dans context. Clés disponibles: {list(context.keys())}")
             
             except Exception as e:
+                print(f"[TDB DEBUG MODEL] ERREUR dans _onchange_filter_id: {e}")
+                import traceback
+                traceback.print_exc()
                 pass  # En cas d'erreur de parsing, on ignore
         
         # Charger les champs de la vue si display_mode est 'list'
@@ -374,6 +394,125 @@ class IsTableauDeBordLine(models.Model):
             sequence += 10
 
 
+    def _extract_filter_context_values(self, filter_obj):
+        """Extrait les valeurs pivot/graph du contexte d'un filtre"""
+        if not filter_obj or not filter_obj.context:
+            return {}
+        
+        try:
+            import ast
+            context = ast.literal_eval(filter_obj.context) if isinstance(filter_obj.context, str) else filter_obj.context
+            if not isinstance(context, dict):
+                return {}
+            
+            result = {}
+            
+            # Récupérer le display_mode depuis le filtre
+            if filter_obj.is_view_type:
+                result['display_mode'] = filter_obj.is_view_type
+            
+            # Pour les pivots
+            if 'pivot_measures' in context:
+                measures = context['pivot_measures']
+                if isinstance(measures, list) and measures:
+                    result['pivot_measure'] = measures[0]
+                else:
+                    result['pivot_measure'] = str(measures)
+            
+            if 'pivot_row_groupby' in context:
+                row_groupby = context['pivot_row_groupby']
+                if isinstance(row_groupby, list):
+                    result['pivot_row_groupby'] = ','.join(row_groupby)
+                else:
+                    result['pivot_row_groupby'] = str(row_groupby)
+            
+            if 'pivot_column_groupby' in context:
+                col_groupby = context['pivot_column_groupby']
+                if isinstance(col_groupby, list):
+                    result['pivot_col_groupby'] = ','.join(col_groupby)
+                else:
+                    result['pivot_col_groupby'] = str(col_groupby)
+            
+            # Pour les graphiques
+            if 'graph_mode' in context:
+                graph_mode = context['graph_mode']
+                if graph_mode in ['bar', 'line', 'pie']:
+                    result['graph_chart_type'] = graph_mode
+            
+            if 'graph_measure' in context:
+                result['graph_measure'] = context['graph_measure']
+            
+            if 'graph_groupbys' in context:
+                groupbys = context['graph_groupbys']
+                if isinstance(groupbys, list):
+                    result['graph_groupbys'] = ','.join(groupbys)
+                else:
+                    result['graph_groupbys'] = str(groupbys)
+            
+            print(f"[TDB DEBUG MODEL] _extract_filter_context_values result: {result}")
+            return result
+            
+        except Exception as e:
+            print(f"[TDB DEBUG MODEL] Error in _extract_filter_context_values: {e}")
+            import traceback
+            traceback.print_exc()
+            return {}
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        """Surcharge create pour extraire automatiquement les valeurs du filtre"""
+        for vals in vals_list:
+            if vals.get('filter_id') and not vals.get('pivot_col_groupby'):
+                # Extraire les valeurs du contexte du filtre
+                filter_obj = self.env['ir.filters'].browse(vals['filter_id'])
+                extracted = self._extract_filter_context_values(filter_obj)
+                # Ne surcharger que les valeurs non définies
+                for key, value in extracted.items():
+                    if key not in vals or not vals[key]:
+                        vals[key] = value
+                print(f"[TDB DEBUG MODEL] create - vals after extraction: pivot_col_groupby={vals.get('pivot_col_groupby')}")
+        
+        return super().create(vals_list)
+
+    def write(self, vals):
+        """Surcharge write pour extraire automatiquement les valeurs du filtre"""
+        # Si on change le filter_id, extraire les nouvelles valeurs
+        if 'filter_id' in vals and vals['filter_id']:
+            for record in self:
+                filter_obj = self.env['ir.filters'].browse(vals['filter_id'])
+                extracted = self._extract_filter_context_values(filter_obj)
+                # Ne surcharger que les valeurs non définies dans vals
+                for key, value in extracted.items():
+                    if key not in vals or not vals[key]:
+                        vals[key] = value
+                print(f"[TDB DEBUG MODEL] write - vals after extraction: pivot_col_groupby={vals.get('pivot_col_groupby')}")
+        
+        return super().write(vals)
+
+
+    def action_refresh_from_filter(self):
+        """Action pour forcer le rechargement des paramètres depuis le filtre"""
+        for record in self:
+            if not record.filter_id:
+                continue
+            
+            extracted = record._extract_filter_context_values(record.filter_id)
+            if extracted:
+                print(f"[TDB DEBUG MODEL] action_refresh_from_filter - extracted: {extracted}")
+                record.write(extracted)
+        
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': 'Paramètres rechargés',
+                'message': 'Les paramètres ont été rechargés depuis le filtre.',
+                'type': 'success',
+                'sticky': False,
+            }
+        }
+
+
     def action_open_filter(self):
         """Ouvrir la recherche enregistrée en plein écran"""
         self.ensure_one()
@@ -406,7 +545,7 @@ class IsTableauDeBordLine(models.Model):
         if self.pivot_row_groupby:
             context['pivot_row_groupby'] = [g.strip() for g in self.pivot_row_groupby.split(',')]
         if self.pivot_col_groupby:
-            context['pivot_col_groupby'] = [g.strip() for g in self.pivot_col_groupby.split(',')]
+            context['pivot_column_groupby'] = [g.strip() for g in self.pivot_col_groupby.split(',')]
         
         # Préparer le domaine
         domain = []

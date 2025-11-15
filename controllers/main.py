@@ -76,11 +76,19 @@ class TableauDeBordController(http.Controller):
                         if line.graph_groupbys:
                             ctx['graph_groupbys'] = line.graph_groupbys
                         if line.pivot_row_groupby:
-                            ctx['pivot_row_groupby'] = line.pivot_row_groupby
+                            # Convertir la chaîne en liste si nécessaire
+                            ctx['pivot_row_groupby'] = [g.strip() for g in line.pivot_row_groupby.split(',')] if ',' in line.pivot_row_groupby else [line.pivot_row_groupby]
+                            _logger.info("[TDB DEBUG CTRL] pivot_row_groupby de la ligne: %s -> ctx: %s", line.pivot_row_groupby, ctx['pivot_row_groupby'])
                         if line.pivot_col_groupby:
-                            ctx['pivot_column_groupby'] = line.pivot_col_groupby
+                            # Convertir la chaîne en liste si nécessaire
+                            ctx['pivot_column_groupby'] = [g.strip() for g in line.pivot_col_groupby.split(',')] if ',' in line.pivot_col_groupby else [line.pivot_col_groupby]
+                            _logger.info("[TDB DEBUG CTRL] pivot_col_groupby de la ligne: %s -> ctx pivot_column_groupby: %s", line.pivot_col_groupby, ctx['pivot_column_groupby'])
+                        else:
+                            _logger.warning("[TDB DEBUG CTRL] line.pivot_col_groupby est VIDE ou False!")
                         if line.pivot_measure:
-                            ctx['pivot_measures'] = line.pivot_measure
+                            # Convertir la chaîne en liste si nécessaire
+                            ctx['pivot_measures'] = [g.strip() for g in line.pivot_measure.split(',')] if ',' in line.pivot_measure else [line.pivot_measure]
+                            _logger.info("[TDB DEBUG CTRL] pivot_measure de la ligne: %s -> ctx: %s", line.pivot_measure, ctx['pivot_measures'])
                         _logger.info("[TDB] Overrides depuis la ligne appliqués: graph_measure=%s graph_groupbys=%s", 
                                    line.graph_measure, line.graph_groupbys)
                 except Exception as e:
@@ -307,8 +315,10 @@ class TableauDeBordController(http.Controller):
             row_gb = row_gb[0] if row_gb else None
         
         col_gb = context.get('pivot_column_groupby')
+        _logger.info("[TDB DEBUG PIVOT] pivot_column_groupby brut du context: %s (type: %s)", col_gb, type(col_gb))
         if isinstance(col_gb, list):
             col_gb = col_gb[0] if col_gb else None
+        _logger.info("[TDB DEBUG PIVOT] col_gb après traitement: %s", col_gb)
         
         # Pour la mesure, utiliser graph_measure du contexte si pivot_measures n'est pas défini
         measures = context.get('pivot_measures') or context.get('graph_measure') or context.get('measure')

@@ -204,6 +204,30 @@ action = records.action_edit_dashboard()
         </field>
     </record>
 
+    <!-- Action serveur pour rafraîchir les paramètres depuis le filtre (pour les lignes) -->
+    <record id="action_server_refresh_from_filter" model="ir.actions.server">
+        <field name="name">Rafraîchir depuis le filtre</field>
+        <field name="model_id" ref="model_is_tableau_de_bord_line"/>
+        <field name="binding_model_id" ref="model_is_tableau_de_bord_line"/>
+        <field name="binding_view_types">form,list</field>
+        <field name="state">code</field>
+        <field name="code">
+action = records.action_refresh_from_filter()
+        </field>
+    </record>
+
+    <!-- Action serveur pour rafraîchir toutes les lignes d'un tableau de bord -->
+    <record id="action_server_refresh_all_lines" model="ir.actions.server">
+        <field name="name">Rafraîchir toutes les lignes depuis les filtres</field>
+        <field name="model_id" ref="model_is_tableau_de_bord"/>
+        <field name="binding_model_id" ref="model_is_tableau_de_bord"/>
+        <field name="binding_view_types">form</field>
+        <field name="state">code</field>
+        <field name="code">
+action = records.action_refresh_all_lines_from_filters()
+        </field>
+    </record>
+
 <!-- 
     <record id="is_tableau_de_bord_action_new" model="ir.actions.act_window">
         <field name="name">Tableaux de bord</field>

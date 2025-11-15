@@ -296,6 +296,8 @@ export class DashboardFormController extends FormController {
                     pivot_column_groupby: line.pivot_col_groupby,
                     pivot_measures: line.pivot_measure,
                 };
+                console.log("[TDB DEBUG JS] Line data - pivot_row_groupby:", line.pivot_row_groupby, "pivot_col_groupby:", line.pivot_col_groupby, "pivot_measure:", line.pivot_measure);
+                console.log("[TDB DEBUG JS] Overrides being sent:", overrides);
                 await this.loadFilterData(lineRecord.id, filterId, serverLineId, overrides);
             } else {
                 this.renderError(lineRecord.id, "Aucun filtre sélectionné");
