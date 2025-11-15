@@ -226,10 +226,10 @@ class TableauDeBordController(http.Controller):
 
     def _get_graph_data(self, model, filter_obj, domain, context, line=None):
         """Génère les données pour un graphique simple"""
-        # Déterminer la limite et le tri
+        # Déterminer la limite et le tri (depuis line ou contexte)
         limit = None
-        sort_by = 'row'  # Par défaut tri par libellé (équivalent à 'row' pour les pivots)
-        sort_order = 'asc'
+        sort_by = context.get('pivot_sort_by', 'row')  # Par défaut tri par libellé
+        sort_order = context.get('pivot_sort_order', 'asc')
         
         if line and hasattr(line, 'limit') and line.limit > 0:
             limit = line.limit
