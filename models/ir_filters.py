@@ -29,6 +29,10 @@ class IrFilters(models.Model):
         ('gantt', 'Gantt'),
         ('map', 'Carte'),
     ], string='Type de vue', help="Type de vue qui était active lors de la création")
+    is_visible_columns = fields.Char(
+        string='Colonnes visibles',
+        help="Liste des colonnes visibles dans la vue list au moment de la création (séparées par des virgules)"
+    )
 
     @api.model
     def create_or_replace(self, vals):
@@ -39,6 +43,10 @@ class IrFilters(models.Model):
         # Extraire les informations du contexte dans vals si elles existent
         if 'context' in vals and vals['context']:
             try:
+                import logging
+                _logger = logging.getLogger(__name__)
+                _logger.info('[TABLEAU DE BORD] Context reçu: %s', vals['context'])
+                
                 # Parser le contexte (peut être une chaîne JSON ou un dict)
                 if isinstance(vals['context'], str):
                     # Remplacer les valeurs JavaScript par des valeurs Python avant de parser
@@ -46,6 +54,8 @@ class IrFilters(models.Model):
                     context_dict = json.loads(context_str) if context_str else {}
                 else:
                     context_dict = vals['context']
+                
+                _logger.info('[TABLEAU DE BORD] Context parsé: %s', context_dict)
                 
                 # Extraire menu_id, view_id et view_type du contexte
                 if 'active_menu_id' in context_dict and context_dict['active_menu_id']:
@@ -59,6 +69,20 @@ class IrFilters(models.Model):
                 if 'view_type' in context_dict and context_dict['view_type']:
                     vals['is_view_type'] = context_dict['view_type']
                     del context_dict['view_type']
+                
+                if 'visible_columns' in context_dict and context_dict['visible_columns']:
+                    # Convertir la liste en chaîne séparée par des virgules
+                    import logging
+                    _logger = logging.getLogger(__name__)
+                    _logger.info('[TABLEAU DE BORD] visible_columns trouvé dans le contexte: %s', context_dict['visible_columns'])
+                    
+                    if isinstance(context_dict['visible_columns'], list):
+                        vals['is_visible_columns'] = ','.join(context_dict['visible_columns'])
+                    else:
+                        vals['is_visible_columns'] = str(context_dict['visible_columns'])
+                    
+                    _logger.info('[TABLEAU DE BORD] is_visible_columns stocké: %s', vals['is_visible_columns'])
+                    del context_dict['visible_columns']
                 
                 # Nettoyer les valeurs None (Python) pour les remplacer par False ou supprimer
                 cleaned_context = {}

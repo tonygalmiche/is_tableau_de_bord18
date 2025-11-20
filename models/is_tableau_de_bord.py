@@ -352,53 +352,37 @@ class IsTableauDeBordLine(models.Model):
         if not self.filter_id or not self.model_id:
             return
         
-        # Essayer de récupérer les champs depuis la vue enregistrée dans le filtre
-        field_names = []
-        view = None
-        
-        # Si le filtre a une vue spécifique (is_view_id), on utilise cette vue
-        if hasattr(self.filter_id, 'is_view_id') and self.filter_id.is_view_id:
-            view = self.filter_id.is_view_id
-            if view.type in ('tree', 'list'):
-                # Parser l'arch pour extraire les champs
-                import lxml.etree as etree
-                try:
-                    arch = etree.fromstring(view.arch)
-                    field_elements = arch.xpath('//field[@name]')
-                    field_names = [f.get('name') for f in field_elements if f.get('name')]
-                except Exception as e:
-                    field_names = []
-        
-        # Si pas de vue spécifique ou pas de champs trouvés, utiliser la vue par défaut du modèle
-        if not field_names:
-            # Récupérer la vue liste par défaut
-            view = self.env['ir.ui.view'].search([
-                ('model', '=', self.filter_id.model_id),
-                ('type', 'in', ['tree', 'list'])
-            ], limit=1, order='priority,id')
-            
-            if view:
-                import lxml.etree as etree
-                try:
-                    arch = etree.fromstring(view.arch)
-                    field_elements = arch.xpath('//field[@name]')
-                    field_names = [f.get('name') for f in field_elements if f.get('name')]
-                except Exception as e:
-                    field_names = []
-        
-        # Si toujours pas de champs, utiliser les champs de base du modèle
-        if not field_names:
-            # Récupérer quelques champs du modèle
-            model = self.env[self.filter_id.model_id]
-            field_names = []
-            for fname, field in model._fields.items():
-                if fname not in ['id', 'create_uid', 'create_date', 'write_uid', 'write_date']:
-                    field_names.append(fname)
-                if len(field_names) >= 10:  # Limiter à 10 champs
-                    break
-        
-        # Récupérer le modèle pour obtenir les labels des champs
+        # Récupérer le modèle
         model = self.env[self.filter_id.model_id]
+        field_names = []
+        
+        # Priorité 1 : Utiliser les colonnes visibles mémorisées dans le filtre
+        if hasattr(self.filter_id, 'is_visible_columns') and self.filter_id.is_visible_columns:
+            import logging
+            _logger = logging.getLogger(__name__)
+            _logger.info('[TABLEAU DE BORD] Colonnes visibles trouvées dans le filtre: %s', self.filter_id.is_visible_columns)
+            field_names = [fname.strip() for fname in self.filter_id.is_visible_columns.split(',') if fname.strip()]
+            _logger.info('[TABLEAU DE BORD] Champs extraits: %s', field_names)
+        
+        # Priorité 2 : Utiliser fields_view_get si pas de colonnes mémorisées
+        if not field_names:
+            view_id = False
+            if hasattr(self.filter_id, 'is_view_id') and self.filter_id.is_view_id:
+                view_id = self.filter_id.is_view_id.id
+            
+            try:
+                view_data = model.fields_view_get(view_id=view_id, view_type='list')
+                import lxml.etree as etree
+                arch = etree.fromstring(view_data['arch'])
+                field_elements = arch.xpath('//field[@name]')
+                field_names = [f.get('name') for f in field_elements if f.get('name')]
+            except Exception as e:
+                # Fallback : champs de base du modèle
+                for fname, field in model._fields.items():
+                    if fname not in ['id', 'create_uid', 'create_date', 'write_uid', 'write_date']:
+                        field_names.append(fname)
+                    if len(field_names) >= 10:
+                        break
         
         # Filtrer les champs valides (qui existent réellement dans le modèle)
         valid_field_names = [fname for fname in field_names if fname and fname in model._fields]

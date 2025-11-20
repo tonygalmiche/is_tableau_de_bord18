@@ -12,6 +12,7 @@
                 <field name="is_menu_id" options="{'no_create': True, 'no_open': True}"/>
                 <field name="is_view_id" options="{'no_create': True}"/>
                 <field name="is_view_type"/>
+                <field name="is_visible_columns"/>
             </field>
         </field>
     </record>
