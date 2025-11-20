@@ -97,7 +97,7 @@
                     </group>
                     <group invisible="display_mode != 'list'">
                         <field name="field_ids">
-                            <list editable="bottom">
+                            <list editable="bottom" limit="500">
                                 <field name="sequence" widget="handle"/>
                                 <field name="field_label" string="Champ"/>
                                 <field name="field_name" column_invisible="1"/>
@@ -106,6 +106,13 @@
                                 <field name="sort_direction" string="Sens"/>
                             </list>
                         </field>
+                        <div class="mt-2">
+                            <button name="action_load_all_model_fields" 
+                                    string="Charger tous les champs du modèle" 
+                                    type="object" 
+                                    class="btn-secondary"
+                                    help="Remplace les champs actuels par tous les champs disponibles dans le modèle (hors champs techniques)"/>
+                        </div>
                     </group>
                 </sheet>
             </form>

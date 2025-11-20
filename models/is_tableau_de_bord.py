@@ -624,6 +624,62 @@ class IsTableauDeBordLine(models.Model):
         # Modifier le nom pour indiquer que c'est une copie
         new_line.name = f"{self.name} (copie)"
 
+    def action_load_all_model_fields(self):
+        """Charger tous les champs du modèle (pas seulement ceux de la vue)"""
+        self.ensure_one()
+        
+        if not self.model_id:
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': 'Aucun modèle',
+                    'message': 'Veuillez d\'abord sélectionner un modèle.',
+                    'type': 'warning',
+                    'sticky': False,
+                }
+            }
+        
+        # Supprimer les champs existants
+        self.field_ids = [(5, 0, 0)]
+        
+        # Récupérer le modèle
+        model = self.env[self.model_id.model]
+        
+        # Liste des champs à exclure (champs techniques)
+        excluded_fields = [
+            'id', 'create_uid', 'create_date', 'write_uid', 'write_date',
+            'display_name', '__last_update', 'access_url', 'access_token',
+            'access_warning', 'activity_ids', 'activity_state', 'activity_user_id',
+            'activity_type_id', 'activity_date_deadline', 'activity_summary',
+            'message_follower_ids', 'message_ids', 'message_partner_ids',
+            'message_channel_ids', 'message_attachment_count', 'message_has_error',
+            'message_has_error_counter', 'message_needaction', 'message_needaction_counter',
+            'message_is_follower', 'website_message_ids', 'message_main_attachment_id',
+        ]
+        
+        # Récupérer tous les champs du modèle
+        field_names = []
+        for fname, field in model._fields.items():
+            # Exclure les champs techniques et les champs calculés sans store
+            if fname not in excluded_fields:
+                # Exclure les one2many et many2many pour simplifier l'affichage
+                if field.type not in ['one2many', 'many2many']:
+                    field_names.append(fname)
+        
+        # Trier par ordre alphabétique
+        field_names.sort()
+        
+        # Créer les lignes de champs
+        sequence = 10
+        for fname in field_names:
+            self.field_ids = [(0, 0, {
+                'field_name': fname,
+                'visible': True,
+                'sequence': sequence,
+            })]
+            sequence += 10
+       
 
 class IsTableauDeBordLineField(models.Model):
     _name = 'is.tableau.de.bord.line.field'

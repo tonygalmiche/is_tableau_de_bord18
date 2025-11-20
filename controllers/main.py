@@ -11,6 +11,20 @@ from lxml import etree
 _logger = logging.getLogger(__name__)
 
 
+def clean_for_json(obj):
+    """Convertit récursivement les frozendict et autres objets non-sérialisables en objets JSON-compatibles"""
+    if obj is None or isinstance(obj, (str, int, float, bool)):
+        return obj
+    elif isinstance(obj, (list, tuple)):
+        return [clean_for_json(item) for item in obj]
+    elif isinstance(obj, dict) or (hasattr(obj, '__class__') and 'frozendict' in str(type(obj))):
+        # Convertir dict ou frozendict
+        return {str(k): clean_for_json(v) for k, v in dict(obj).items()}
+    else:
+        # Pour les autres types, tenter une conversion en string
+        return str(obj)
+
+
 class TableauDeBordController(http.Controller):
 
     @http.route('/tableau_de_bord/get_filter_data/<int:filter_id>', type='json', auth='user')
@@ -239,12 +253,15 @@ class TableauDeBordController(http.Controller):
         else:
             recs = model.search(domain, limit=limit)
             
-        data = recs.read(fields_to_display) if recs else []
+        # Lire les données et convertir en dictionnaires normaux pour éviter les frozendict
+        raw_data = recs.read(fields_to_display) if recs else []
+        data = [clean_for_json(row) for row in raw_data]
 
         # Créer les métadonnées avec type et digits pour le formatage
         fields_meta = []
         for f in fields_to_display:
             field_info = fields_def.get(f, {})
+            
             meta = {
                 'name': f,
                 'string': field_labels.get(f, f),
@@ -256,7 +273,7 @@ class TableauDeBordController(http.Controller):
                 if digits:
                     # digits peut être [precision, scale] ou (precision, scale)
                     if isinstance(digits, (list, tuple)) and len(digits) >= 2:
-                        meta['digits'] = digits[1]  # scale (nombre de décimales)
+                        meta['digits'] = int(digits[1])  # scale (nombre de décimales) - convertir en int
                     else:
                         meta['digits'] = 2  # Par défaut 2 décimales
                 else:
