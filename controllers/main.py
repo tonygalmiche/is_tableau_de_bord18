@@ -255,6 +255,21 @@ class TableauDeBordController(http.Controller):
             
         # Lire les données et convertir en dictionnaires normaux pour éviter les frozendict
         raw_data = recs.read(fields_to_display) if recs else []
+        
+        # Convertir les valeurs de selection en leurs libellés
+        for row in raw_data:
+            for f in fields_to_display:
+                field_info = fields_def.get(f, {})
+                if field_info.get('type') == 'selection' and f in row and row[f]:
+                    # Récupérer les options de sélection
+                    selection = field_info.get('selection', [])
+                    if selection:
+                        # Chercher le libellé correspondant à la valeur
+                        for key, label in selection:
+                            if key == row[f]:
+                                row[f] = label
+                                break
+        
         data = [clean_for_json(row) for row in raw_data]
 
         # Créer les métadonnées avec type et digits pour le formatage

@@ -606,13 +606,16 @@ class IsTableauDeBordLine(models.Model):
                 }
             }
         
+        # Récupérer la vue formulaire personnalisée pour ir.filters
+        view_id = self.env.ref('is_tableau_de_bord18.view_ir_filters_form_tableau_de_bord').id
+        
         return {
             'type': 'ir.actions.act_window',
             'name': 'Modifier la recherche enregistrée',
             'res_model': 'ir.filters',
             'res_id': self.filter_id.id,
             'view_mode': 'form',
-            'views': [[False, 'form']],
+            'views': [[view_id, 'form']],
             'target': 'current',
         }
 
