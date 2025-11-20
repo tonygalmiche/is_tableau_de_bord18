@@ -358,11 +358,7 @@ class IsTableauDeBordLine(models.Model):
         
         # Priorité 1 : Utiliser les colonnes visibles mémorisées dans le filtre
         if hasattr(self.filter_id, 'is_visible_columns') and self.filter_id.is_visible_columns:
-            import logging
-            _logger = logging.getLogger(__name__)
-            _logger.info('[TABLEAU DE BORD] Colonnes visibles trouvées dans le filtre: %s', self.filter_id.is_visible_columns)
             field_names = [fname.strip() for fname in self.filter_id.is_visible_columns.split(',') if fname.strip()]
-            _logger.info('[TABLEAU DE BORD] Champs extraits: %s', field_names)
         
         # Priorité 2 : Utiliser fields_view_get si pas de colonnes mémorisées
         if not field_names:
