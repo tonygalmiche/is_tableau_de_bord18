@@ -163,6 +163,7 @@ class TableauDeBordController(http.Controller):
         line_id = context.get('line_id')
         explicit_fields = []
         field_labels = {}
+        order_string = None  # Chaîne de tri pour search()
         
         if line_id:
             try:
@@ -170,6 +171,20 @@ class TableauDeBordController(http.Controller):
                 if line and line.exists() and line.field_ids:
                     # Récupérer uniquement les champs visibles
                     visible_fields = line.field_ids.filtered(lambda f: f.visible).sorted('sequence')
+                    
+                    # Récupérer les champs avec ordre de tri (sort_order > 0)
+                    sort_fields = line.field_ids.filtered(lambda f: f.sort_order > 0).sorted('sort_order')
+                    
+                    if sort_fields:
+                        # Construire la chaîne de tri : "field1 asc, field2 desc, ..."
+                        order_parts = []
+                        for field_config in sort_fields:
+                            field_name = field_config.field_name
+                            direction = field_config.sort_direction or 'asc'
+                            if field_name and field_name in model._fields:
+                                order_parts.append(f"{field_name} {direction}")
+                        if order_parts:
+                            order_string = ', '.join(order_parts)
                     
                     # Maintenant field_name contient le nom technique et field_label le libellé
                     for field_config in visible_fields:
@@ -215,7 +230,12 @@ class TableauDeBordController(http.Controller):
         else:
             fields_to_display, field_labels = self._get_fields_from_view(model, 'list', view_id=view_id)
 
-        recs = model.search(domain, limit=limit)
+        # Appliquer le tri si défini
+        if order_string:
+            recs = model.search(domain, limit=limit, order=order_string)
+        else:
+            recs = model.search(domain, limit=limit)
+            
         data = recs.read(fields_to_display) if recs else []
 
         fields_meta = [{'name': f, 'string': field_labels.get(f, f)} for f in fields_to_display]

@@ -102,6 +102,8 @@
                                 <field name="field_label" string="Champ"/>
                                 <field name="field_name" column_invisible="1"/>
                                 <field name="visible" widget="boolean_toggle"/>
+                                <field name="sort_order" string="Ordre de tri"/>
+                                <field name="sort_direction" string="Sens"/>
                             </list>
                         </field>
                     </group>

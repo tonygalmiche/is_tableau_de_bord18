@@ -178,7 +178,7 @@ class IsTableauDeBordLine(models.Model):
     pivot_show_col_totals = fields.Boolean('Afficher les totaux des colonnes', default=True, help='Ajouter une ligne de total pour chaque colonne')
     limit = fields.Integer('Limite', default=0, help='Nombre maximum de lignes à afficher (0 = toutes les lignes)')
     filter_domain     = fields.Char(compute='_compute_filter_domain', store=False)
-    field_ids         = fields.One2many('is.tableau.de.bord.line.field', 'line_id', string='Champs de la liste')
+    field_ids         = fields.One2many('is.tableau.de.bord.line.field', 'line_id', string='Champs de la liste', copy=True)
     model_ids         = fields.Many2many('ir.model', compute='_compute_model_ids', store=False, compute_sudo=True)
 
 
@@ -635,6 +635,11 @@ class IsTableauDeBordLineField(models.Model):
     field_name = fields.Char('Nom du champ', required=True, help='Nom technique du champ')
     field_label = fields.Char('Libellé du champ', compute='_compute_field_label', store=True, readonly=False, help='Libellé affiché du champ')
     visible = fields.Boolean('Visible', default=True, help='Afficher ce champ dans le tableau de bord')
+    sort_order = fields.Integer('Ordre de tri', default=0, help='Ordre de tri (0 = pas de tri, 1 = premier critère, 2 = deuxième critère, etc.)')
+    sort_direction = fields.Selection([
+        ('asc', 'Croissant'),
+        ('desc', 'Décroissant'),
+    ], string='Sens du tri', default='asc', help='Sens du tri pour ce champ')
     
     @api.depends('field_name', 'line_id.model_id')
     def _compute_field_label(self):
