@@ -345,7 +345,10 @@ export class DashboardFormController extends FormController {
         html += '<thead><tr>';
         for (const f of validFields) {
             const label = typeof f === 'string' ? f : (f?.string || f?.name || 'Sans nom');
-            html += `<th style="white-space: nowrap; font-size: 0.875rem; overflow: hidden; text-overflow: ellipsis; max-width: 200px; padding: 0.25rem 0.5rem;" title="${label}">${label}</th>`;
+            const fieldType = f?.type || 'char';
+            const isNumeric = ['integer', 'float', 'monetary'].includes(fieldType);
+            const alignClass = isNumeric ? 'text-end' : '';
+            html += `<th class="${alignClass}" style="white-space: nowrap; font-size: 0.875rem; overflow: hidden; text-overflow: ellipsis; max-width: 200px; padding: 0.25rem 0.5rem;" title="${label}">${label}</th>`;
         }
         html += '</tr></thead>';
         
@@ -355,20 +358,37 @@ export class DashboardFormController extends FormController {
             html += '<tr>';
             for (const f of validFields) {
                 const name = typeof f === 'string' ? f : (f?.name || '');
+                const fieldType = f?.type || 'char';
+                const digits = f?.digits;
                 let val = row[name];
-                if (Array.isArray(val)) {
+                let displayVal = '';
+                let alignClass = '';
+                
+                // Traitement selon le type de champ
+                if (fieldType === 'integer' && val !== null && val !== undefined && val !== false) {
+                    // Entier avec séparateur de milliers
+                    alignClass = 'text-end';
+                    displayVal = parseInt(val).toLocaleString('fr-FR');
+                } else if ((fieldType === 'float' || fieldType === 'monetary') && val !== null && val !== undefined && val !== false) {
+                    // Décimal avec séparateur de milliers et respect des décimales
+                    alignClass = 'text-end';
+                    const numDigits = digits !== undefined ? digits : 2;
+                    displayVal = parseFloat(val).toLocaleString('fr-FR', {
+                        minimumFractionDigits: numDigits,
+                        maximumFractionDigits: numDigits
+                    });
+                } else if (Array.isArray(val)) {
                     // many2one: [id, display]
-                    val = val.length > 1 ? val[1] : val[0];
+                    displayVal = val.length > 1 ? val[1] : val[0];
                 } else if (val && typeof val === 'object') {
                     // divers formats -> stringify propre
-                    val = val.display_name || val.name || JSON.stringify(val);
-                }
-                // Ne pas afficher false/null/undefined comme texte
-                let displayVal = '';
-                if (val !== null && val !== undefined && val !== false) {
+                    displayVal = val.display_name || val.name || JSON.stringify(val);
+                } else if (val !== null && val !== undefined && val !== false) {
+                    // Valeur simple
                     displayVal = val;
                 }
-                html += `<td>${displayVal}</td>`;
+                
+                html += `<td class="${alignClass}">${displayVal}</td>`;
             }
             html += '</tr>';
         }

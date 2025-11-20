@@ -230,6 +230,9 @@ class TableauDeBordController(http.Controller):
         else:
             fields_to_display, field_labels = self._get_fields_from_view(model, 'list', view_id=view_id)
 
+        # Récupérer les métadonnées complètes des champs pour le formatage
+        fields_def = model.fields_get(fields_to_display)
+        
         # Appliquer le tri si défini
         if order_string:
             recs = model.search(domain, limit=limit, order=order_string)
@@ -238,7 +241,27 @@ class TableauDeBordController(http.Controller):
             
         data = recs.read(fields_to_display) if recs else []
 
-        fields_meta = [{'name': f, 'string': field_labels.get(f, f)} for f in fields_to_display]
+        # Créer les métadonnées avec type et digits pour le formatage
+        fields_meta = []
+        for f in fields_to_display:
+            field_info = fields_def.get(f, {})
+            meta = {
+                'name': f,
+                'string': field_labels.get(f, f),
+                'type': field_info.get('type', 'char'),
+            }
+            # Ajouter digits pour les champs float et monetary
+            if meta['type'] in ('float', 'monetary'):
+                digits = field_info.get('digits')
+                if digits:
+                    # digits peut être [precision, scale] ou (precision, scale)
+                    if isinstance(digits, (list, tuple)) and len(digits) >= 2:
+                        meta['digits'] = digits[1]  # scale (nombre de décimales)
+                    else:
+                        meta['digits'] = 2  # Par défaut 2 décimales
+                else:
+                    meta['digits'] = 2  # Par défaut 2 décimales
+            fields_meta.append(meta)
 
         result = {
             'type': 'list',
