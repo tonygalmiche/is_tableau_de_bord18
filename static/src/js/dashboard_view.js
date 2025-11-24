@@ -13,10 +13,38 @@ export class DashboardFormController extends FormController {
         
         onMounted(() => {
             // Vérifier si nous sommes en mode dashboard
-            if (this.props.context?.dashboard_mode) {
+            if (this.isDashboard()) {
                 this.setupDashboard();
             }
         });
+    }
+
+    isDashboard() {
+        // Vérification du contexte
+        const contextMode = this.props.context?.dashboard_mode;
+        
+        // Vérification de l'arch (XML de la vue)
+        let archMode = false;
+        try {
+            if (this.props.arch) {
+                const arch = this.props.arch;
+                // Cas 1: Element XML (DOM) - Cas le plus fréquent en Odoo 16+
+                if (typeof arch.getAttribute === 'function') {
+                    const className = arch.getAttribute('class');
+                    if (className) {
+                        archMode = className.includes('o_dashboard_form');
+                    }
+                }
+                // Cas 2: Objet JS avec attrs
+                else if (arch.attrs && arch.attrs.class) {
+                    archMode = arch.attrs.class.includes('o_dashboard_form');
+                }
+            }
+        } catch(e) {
+            // Ignorer les erreurs d'accès à l'arch
+        }
+        
+        return contextMode || archMode;
     }
 
     async setupDashboard() {
@@ -633,7 +661,7 @@ registry.category("views").add("form", {
             // Toujours initialiser le contrôleur parent
             super.setup();
             // Puis si dashboard, déclencher la logique spécifique
-            if (this.props.context?.dashboard_mode) {
+            if (this.isDashboard()) {
                 try {
                     DashboardFormController.prototype.setup.call(this);
                 } catch (e) {
@@ -641,106 +669,134 @@ registry.category("views").add("form", {
                 }
             }
         }
+
+        isDashboard() {
+            // Vérification du contexte
+            const contextMode = this.props.context?.dashboard_mode;
+            
+            // Vérification de l'arch (XML de la vue)
+            let archMode = false;
+            try {
+                if (this.props.arch) {
+                    const arch = this.props.arch;
+                    // Cas 1: Element XML (DOM)
+                    if (typeof arch.getAttribute === 'function') {
+                        const className = arch.getAttribute('class');
+                        if (className) {
+                            archMode = className.includes('o_dashboard_form');
+                        }
+                    }
+                    // Cas 2: Objet JS avec attrs
+                    else if (arch.attrs && arch.attrs.class) {
+                        archMode = arch.attrs.class.includes('o_dashboard_form');
+                    }
+                }
+            } catch(e) {
+                // Ignorer les erreurs
+            }
+            
+            return contextMode || archMode;
+        }
         
         // Déléguer les autres méthodes si nécessaire
         async checkUserPermissions() {
-            if (this.props.context?.dashboard_mode) {
+            if (this.isDashboard()) {
                 return DashboardFormController.prototype.checkUserPermissions.call(this);
             }
         }
         
         async setupDashboard() {
-            if (this.props.context?.dashboard_mode) {
+            if (this.isDashboard()) {
                 return DashboardFormController.prototype.setupDashboard.call(this);
             }
         }
         
         createDashboardLayout() {
-            if (this.props.context?.dashboard_mode) {
+            if (this.isDashboard()) {
                 return DashboardFormController.prototype.createDashboardLayout.call(this);
             }
         }
         
         async loadDashboardItems() {
-            if (this.props.context?.dashboard_mode) {
+            if (this.isDashboard()) {
                 return DashboardFormController.prototype.loadDashboardItems.call(this);
             }
         }
         
         async loadFilterData(lineId, filterId, backendLineId, overrides) {
-            if (this.props.context?.dashboard_mode) {
+            if (this.isDashboard()) {
                 return DashboardFormController.prototype.loadFilterData.call(this, lineId, filterId, backendLineId, overrides);
             }
         }
         
         renderFilterData(lineId, data) {
-            if (this.props.context?.dashboard_mode) {
+            if (this.isDashboard()) {
                 return DashboardFormController.prototype.renderFilterData.call(this, lineId, data);
             }
         }
         
         renderListData(container, data) {
-            if (this.props.context?.dashboard_mode) {
+            if (this.isDashboard()) {
                 return DashboardFormController.prototype.renderListData.call(this, container, data);
             }
         }
         
         renderGraphData(container, data) {
-            if (this.props.context?.dashboard_mode) {
+            if (this.isDashboard()) {
                 return DashboardFormController.prototype.renderGraphData.call(this, container, data);
             }
         }
         
         renderPivotData(container, data) {
-            if (this.props.context?.dashboard_mode) {
+            if (this.isDashboard()) {
                 return DashboardFormController.prototype.renderPivotData.call(this, container, data);
             }
         }
         
         renderError(lineId, message) {
-            if (this.props.context?.dashboard_mode) {
+            if (this.isDashboard()) {
                 return DashboardFormController.prototype.renderError.call(this, lineId, message);
             }
         }
         
         attachOpenFilterLinks() {
-            if (this.props.context?.dashboard_mode) {
+            if (this.isDashboard()) {
                 return DashboardFormController.prototype.attachOpenFilterLinks.call(this);
             }
         }
         
         attachEditFilterLinks() {
-            if (this.props.context?.dashboard_mode) {
+            if (this.isDashboard()) {
                 return DashboardFormController.prototype.attachEditFilterLinks.call(this);
             }
         }
         
         attachEditLineLinks() {
-            if (this.props.context?.dashboard_mode) {
+            if (this.isDashboard()) {
                 return DashboardFormController.prototype.attachEditLineLinks.call(this);
             }
         }
         
         async openFilterFullScreen(lineId) {
-            if (this.props.context?.dashboard_mode) {
+            if (this.isDashboard()) {
                 return DashboardFormController.prototype.openFilterFullScreen.call(this, lineId);
             }
         }
         
         async editFilter(lineId) {
-            if (this.props.context?.dashboard_mode) {
+            if (this.isDashboard()) {
                 return DashboardFormController.prototype.editFilter.call(this, lineId);
             }
         }
         
         async editLine(lineId) {
-            if (this.props.context?.dashboard_mode) {
+            if (this.isDashboard()) {
                 return DashboardFormController.prototype.editLine.call(this, lineId);
             }
         }
         
         formatNumber(value) {
-            if (this.props.context?.dashboard_mode) {
+            if (this.isDashboard()) {
                 return DashboardFormController.prototype.formatNumber.call(this, value);
             }
             // Fallback si pas en mode dashboard

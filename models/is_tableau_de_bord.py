@@ -15,6 +15,8 @@ class IsTableauDeBord(models.Model):
 
     def action_view_dashboard(self):
         """Action pour afficher le tableau de bord"""
+        self.ensure_one()
+        
         return {
             'type': 'ir.actions.act_window',
             'name': f'Tableau de bord - {self.name}',
@@ -24,7 +26,23 @@ class IsTableauDeBord(models.Model):
             'target': 'main',
             'context': {'dashboard_mode': True},
             'views': [(self.env.ref('is_tableau_de_bord18.view_is_tableau_de_bord_dashboard').id, 'form')],
-            'flags': {'mode': 'readonly'},
+        }
+
+    @api.model
+    def action_view_dashboard_list(self):
+        """Action pour afficher la liste des tableaux de bord en mode visualisation"""
+        return {
+            'type': 'ir.actions.act_window',
+            'name': 'Visualiser les tableaux de bord',
+            'res_model': 'is.tableau.de.bord',
+            'view_mode': 'kanban,form',
+            'domain': [('active', '=', True)],
+            'target': 'main',
+            'context': {'dashboard_mode': True},
+            'views': [
+                (self.env.ref('is_tableau_de_bord18.view_is_tableau_de_bord_kanban_view').id, 'kanban'),
+                (self.env.ref('is_tableau_de_bord18.view_is_tableau_de_bord_dashboard').id, 'form')
+            ],
         }
 
     def action_back_to_list(self):
@@ -39,7 +57,11 @@ class IsTableauDeBord(models.Model):
         }
 
     def action_edit_dashboard(self):
-        """Ouvrir le formulaire d'édition du tableau de bord"""
+        """Ouvrir le formulaire d'édition du tableau de bord ou la vue dashboard selon les droits"""
+        # Si l'utilisateur n'est pas manager, on le redirige vers la vue dashboard
+        if not self.env.user.has_group('is_tableau_de_bord18.group_tableau_de_bord_manager'):
+            return self.action_view_dashboard()
+
         return {
             'type': 'ir.actions.act_window',
             'name': 'Modifier le tableau de bord',
@@ -47,7 +69,7 @@ class IsTableauDeBord(models.Model):
             'view_mode': 'form',
             'res_id': self.id,
             'target': 'main',
-            'views': [(self.env.ref('is_tableau_de_bord18.view_is_tableau_de_bord_form').id, 'form')],
+            'views': [(self.env.ref('is_tableau_de_bord18.view_is_tableau_de_bord_form_view').id, 'form')],
         }
 
     @api.model
@@ -61,34 +83,12 @@ class IsTableauDeBord(models.Model):
         is_manager = self.env.user.has_group('is_tableau_de_bord18.group_tableau_de_bord_manager')
         
         if is_manager:
-            # Gestionnaire : accès complet avec kanban, list, form
-            view_mode = 'kanban,list,form'
+            # Gestionnaire : retourner l'action de configuration (vue formulaire normale)
+            action = self.env.ref('is_tableau_de_bord18.is_tableau_de_bord_action_config').read()[0]
         else:
-            # Utilisateur simple : vue kanban seulement
-            view_mode = 'kanban'
+            # Utilisateur simple : vue kanban en visualisation uniquement
+            action = self.action_view_dashboard_list()
         
-
-        action = {
-            'type': 'ir.actions.act_window',
-            'name': 'Mes tableaux de bord',
-            'res_model': 'is.tableau.de.bord',
-            'view_mode': view_mode,
-            'domain': [('active', '=', True)],
-            'target': 'main',
-            'context': {},
-            'help': """
-                <p class="o_view_nocontent_smiling_face">
-                    Aucun tableau de bord disponible !
-                </p>
-            """ if not is_manager else """
-                <p class="o_view_nocontent_smiling_face">
-                    Aucun tableau de bord disponible !
-                </p>
-                <p>
-                    Créez d'abord vos tableaux de bord.
-                </p>
-            """
-        }
         return action
 
     def action_refresh_all_lines_from_filters(self):

@@ -1,11 +1,46 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     
+    <!-- Action act_window pour CONFIGURER un tableau de bord (vue formulaire normale) -->
+    <record id="is_tableau_de_bord_action_edit" model="ir.actions.act_window">
+        <field name="name">Configurer le tableau de bord</field>
+        <field name="res_model">is.tableau.de.bord</field>
+        <field name="view_mode">form</field>
+        <field name="target">main</field>
+        <field name="view_id" ref="view_is_tableau_de_bord_form_view"/>
+    </record>
+
+    <!-- Action act_window pour VISUALISER un tableau de bord (vue dashboard) -->
+    <record id="is_tableau_de_bord_action_view_single_window" model="ir.actions.act_window">
+        <field name="name">Visualiser le tableau de bord</field>
+        <field name="res_model">is.tableau.de.bord</field>
+        <field name="view_mode">form</field>
+        <field name="target">main</field>
+        <field name="context">{'dashboard_mode': True}</field>
+        <field name="view_id" ref="view_is_tableau_de_bord_dashboard"/>
+    </record>
+
+    <!-- Action serveur pour visualiser UN tableau de bord spécifique (URL avec ID) -->
+    <record id="is_tableau_de_bord_action_view_single" model="ir.actions.server">
+        <field name="name">Visualiser le tableau de bord</field>
+        <field name="model_id" ref="model_is_tableau_de_bord"/>
+        <field name="binding_model_id" ref="model_is_tableau_de_bord"/>
+        <field name="state">code</field>
+        <field name="code">
+if env.context.get('active_id'):
+    action = model.browse(env.context.get('active_id')).action_view_dashboard()
+elif env.context.get('active_ids'):
+    action = model.browse(env.context.get('active_ids')[0]).action_view_dashboard()
+else:
+    action = model.action_view_dashboard_list()
+        </field>
+    </record>
+
     <!-- Vue formulaire du tableau de bord -->
     <record id="view_is_tableau_de_bord_form_view" model="ir.ui.view">
         <field name="name">is.tableau.de.bord.form</field>
         <field name="model">is.tableau.de.bord</field>
-        <field name="priority" eval="1"/>
+        <field name="priority" eval="32"/>
         <field name="arch" type="xml">
             <form string="Tableau de bord">
                 <!-- <header>
@@ -125,7 +160,7 @@
         <field name="model">is.tableau.de.bord</field>
         <field name="arch" type="xml">
             <list string="Tableaux de bord">
-                <button name="action_view_dashboard" string="Voir" type="object" icon="fa-eye"/>
+                <button name="%(is_tableau_de_bord_action_view_single)d" string="Voir" type="action" icon="fa-eye"/>
                 <field name="name"/>
             </list>
         </field>
@@ -136,7 +171,7 @@
         <field name="name">is.tableau.de.bord.kanban</field>
         <field name="model">is.tableau.de.bord</field>
         <field name="arch" type="xml">
-            <kanban string="Tableaux de bord" class="o_kanban_dashboard">
+            <kanban string="Tableaux de bord" class="o_kanban_dashboard" action="action_edit_dashboard" type="object">
                 <field name="id"/>
                 <field name="name"/>
                 <field name="description"/>
@@ -149,7 +184,7 @@
                                 </div>
                                 <div class="o_kanban_record_body">
                                     <div class="text-center">
-                                        <button type="object" name="action_view_dashboard" class="btn btn-primary oe_kanban_action">
+                                        <button name="%(is_tableau_de_bord_action_view_single)d" type="action" class="btn btn-primary oe_kanban_action oe_kanban_action_a">
                                             <i class="fa fa-eye"/> Voir le tableau de bord
                                         </button>
                                     </div>
@@ -169,7 +204,7 @@
     <record id="view_is_tableau_de_bord_dashboard" model="ir.ui.view">
         <field name="name">is.tableau.de.bord.dashboard</field>
         <field name="model">is.tableau.de.bord</field>
-        <field name="priority" eval="99"/>
+        <field name="priority" eval="1"/>
         <field name="arch" type="xml">
             <form string="Tableau de bord" class="o_dashboard_form">
                 <!-- <header>
@@ -212,7 +247,22 @@
         </field>
     </record>
 
- 
+    <!-- Action serveur pour visualiser les tableaux de bord (URL spécifique) -->
+    <record id="is_tableau_de_bord_action_view" model="ir.actions.server">
+        <field name="name">Visualiser les tableaux de bord</field>
+        <field name="model_id" ref="model_is_tableau_de_bord"/>
+        <field name="binding_model_id" ref="model_is_tableau_de_bord"/>
+        <field name="state">code</field>
+        <field name="code">action = model.action_view_dashboard_list()</field>
+    </record>
+
+    <!-- Menu pour accéder directement aux tableaux de bord en mode visualisation -->
+    <!-- <menuitem id="is_tableau_de_bord_menu_view"
+              name="Voir les tableaux de bord"
+              action="is_tableau_de_bord_action_view"
+              groups="group_tableau_de_bord_user"
+              sequence="497"/> -->
+
     <!-- Action serveur qui appelle la méthode Python pour retourner la bonne action -->
     <record id="is_tableau_de_bord_actions_server" model="ir.actions.server">
         <field name="name">Mes tableaux de bord</field>
@@ -262,20 +312,19 @@ action = records.action_refresh_all_lines_from_filters()
         </field>
     </record>
 
-<!-- 
-    <record id="is_tableau_de_bord_action_new" model="ir.actions.act_window">
-        <field name="name">Tableaux de bord</field>
-        <field name="type">ir.actions.act_window</field>
+    <!-- Action pour configurer les tableaux de bord (avec vue formulaire normale) -->
+    <record id="is_tableau_de_bord_action_config" model="ir.actions.act_window">
+        <field name="name">Configurer les tableaux de bord</field>
         <field name="res_model">is.tableau.de.bord</field>
         <field name="view_mode">kanban,list,form</field>
-        <field name="limit">200</field>
+        <field name="domain">[('active', '=', True)]</field>
+        <field name="context">{}</field>
+        <field name="views" eval="[
+            (ref('view_is_tableau_de_bord_kanban_view'), 'kanban'),
+            (ref('view_is_tableau_de_bord_list_view'), 'list'),
+            (ref('view_is_tableau_de_bord_form_view'), 'form')
+        ]"/>
     </record>
-    <menuitem id="is_tableau_de_bord_menu"
-              name="Tableaux de bord"
-              action="is_tableau_de_bord_action_new"
-              groups="group_tableau_de_bord_user"
-              sequence="498"/>
- -->
 
     <!-- Menu pour visualiser les tableaux de bord -->
     <record id="is_tableau_de_bord_actions_server" model="ir.actions.server">
