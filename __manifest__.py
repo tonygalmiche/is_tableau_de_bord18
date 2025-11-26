@@ -36,6 +36,7 @@ Fonctionnalités :
    'assets': {
         'web.assets_backend': [
             'is_tableau_de_bord18/static/src/css/dashboard.css',
+            'is_tableau_de_bord18/static/src/scss/kanban_view.scss',
             'web/static/lib/Chart/Chart.js',
             'is_tableau_de_bord18/static/src/js/dashboard_view.js',
             'is_tableau_de_bord18/static/src/js/custom_favorite_item.js',

@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import random
 from odoo import models, fields, api
 
 
@@ -12,6 +13,8 @@ class IsTableauDeBord(models.Model):
     description = fields.Text('Description')
     line_ids = fields.One2many('is.tableau.de.bord.line', 'tableau_id', copy=True, string='Lignes du tableau de bord')
     active = fields.Boolean('Actif', default=True)
+    color = fields.Integer('Couleur', default=lambda self: random.randint(1, 11))
+    image = fields.Binary('Image', attachment=True)
 
     def action_view_dashboard(self):
         """Action pour afficher le tableau de bord"""
@@ -80,15 +83,8 @@ class IsTableauDeBord(models.Model):
     @api.model
     def action_open_tableaux_de_bord(self):
         """Action pour ouvrir les tableaux de bord selon les droits de l'utilisateur"""
-        is_manager = self.env.user.has_group('is_tableau_de_bord18.group_tableau_de_bord_manager')
-        
-        if is_manager:
-            # Gestionnaire : retourner l'action de configuration (vue formulaire normale)
-            action = self.env.ref('is_tableau_de_bord18.is_tableau_de_bord_action_config').read()[0]
-        else:
-            # Utilisateur simple : vue kanban en visualisation uniquement
-            action = self.action_view_dashboard_list()
-        
+        # Tout le monde (managers et utilisateurs) voit la vue kanban pour visualiser
+        action = self.action_view_dashboard_list()
         return action
 
     def action_refresh_all_lines_from_filters(self):
