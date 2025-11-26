@@ -49,6 +49,7 @@
                                 <field name="show_data_title" optional="hide"/>
                                 <field name="show_record_count" optional="hide"/>
                                 <field name="limit" optional="hide"/>
+                                <field name="list_groupby" optional="hide"/>
                             </list>
                         </field>
                     </group>
@@ -124,6 +125,7 @@
                     </group>
                     <group invisible="display_mode != 'list'">
                         <field name="show_record_count"/>
+                        <field name="list_groupby" help="Champs de regroupement séparés par des virgules (ex: secteur_id,partner_id). Si défini, affiche une ligne par regroupement avec les totaux des champs numériques."/>
                     </group>
                     <group invisible="display_mode != 'list'">
                         <field name="field_ids">
@@ -189,6 +191,7 @@
                                 <field name="pivot_show_row_totals"/>
                                 <field name="pivot_show_col_totals"/>
                                 <field name="show_record_count"/>
+                                <field name="list_groupby"/>
                             </list>
                         </field>
                     </div>

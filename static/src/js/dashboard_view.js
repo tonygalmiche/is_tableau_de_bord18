@@ -312,6 +312,8 @@ export class DashboardFormController extends FormController {
                     pivot_measures: line.pivot_measure,
                     pivot_sort_by: line.pivot_sort_by,
                     pivot_sort_order: line.pivot_sort_order,
+                    // Pour les listes groupées
+                    list_groupby: line.list_groupby,
                 };
                 console.log(`[TDB JS] Line ${serverLineId}:`, {
                     name: line.name,
@@ -384,37 +386,67 @@ export class DashboardFormController extends FormController {
             return;
         }
         
-        let html = '<div class="table-responsive h-100"><table class="table table-sm table-striped mb-0">';
+        // Détecter si c'est une liste groupée
+        const isGrouped = data.is_grouped === true;
+        
+        let html = '<div class="table-responsive h-100"><table class="table table-sm mb-0">';
         
         // En-têtes
-        html += '<thead><tr>';
+        html += '<thead class="table-light"><tr>';
         for (const f of validFields) {
             const label = typeof f === 'string' ? f : (f?.string || f?.name || 'Sans nom');
             const fieldType = f?.type || 'char';
             const isNumeric = ['integer', 'float', 'monetary'].includes(fieldType);
+            const isAggregate = f?.is_aggregate === true;
             const alignClass = isNumeric ? 'text-end' : '';
-            html += `<th class="${alignClass}" style="white-space: nowrap; font-size: 0.875rem; overflow: hidden; text-overflow: ellipsis; max-width: 200px; padding: 0.25rem 0.5rem;" title="${label}">${label}</th>`;
+            // Style spécial pour les colonnes d'agrégation
+            const headerStyle = isAggregate ? 'background-color: #e3f2fd;' : '';
+            html += `<th class="${alignClass}" style="white-space: nowrap; font-size: 0.875rem; overflow: hidden; text-overflow: ellipsis; max-width: 200px; padding: 0.25rem 0.5rem; ${headerStyle}" title="${label}">${label}</th>`;
         }
         html += '</tr></thead>';
         
         // Données
         html += '<tbody>';
         for (const row of data.data) {
-            html += '<tr>';
+            // Détecter si c'est une ligne d'en-tête de groupe (total de niveau 1)
+            const isGroupHeader = row._is_group_header === true;
+            const groupLevel = row._group_level || 1;
+            
+            // Style de la ligne selon le niveau
+            let rowClass = '';
+            let rowStyle = '';
+            if (isGroupHeader) {
+                // Ligne de total de groupe : fond coloré et texte en gras
+                rowClass = 'table-primary';
+                rowStyle = 'font-weight: 600;';
+            } else if (groupLevel === 2) {
+                // Ligne de détail niveau 2 : légèrement indentée visuellement
+                rowStyle = 'background-color: #fafbfc;';
+            }
+            
+            html += `<tr class="${rowClass}" style="${rowStyle}">`;
             for (const f of validFields) {
                 const name = typeof f === 'string' ? f : (f?.name || '');
                 const fieldType = f?.type || 'char';
                 const digits = f?.digits;
+                const isAggregate = f?.is_aggregate === true;
+                const isGroupby = f?.is_groupby === true;
                 let val = row[name];
                 let displayVal = '';
                 let alignClass = '';
+                let cellStyle = '';
+                
+                // Style spécial pour les cellules d'agrégation
+                if (isAggregate && !isGroupHeader) {
+                    cellStyle = 'background-color: #f5faff;';
+                }
                 
                 // Traitement selon le type de champ
-                if (fieldType === 'integer' && val !== null && val !== undefined && val !== false) {
+                if (fieldType === 'integer' && val !== null && val !== undefined && val !== false && val !== '') {
                     // Entier avec séparateur de milliers
                     alignClass = 'text-end';
                     displayVal = parseInt(val).toLocaleString('fr-FR');
-                } else if ((fieldType === 'float' || fieldType === 'monetary') && val !== null && val !== undefined && val !== false) {
+                } else if ((fieldType === 'float' || fieldType === 'monetary') && val !== null && val !== undefined && val !== false && val !== '') {
                     // Décimal avec séparateur de milliers et respect des décimales
                     alignClass = 'text-end';
                     const numDigits = digits !== undefined ? digits : 2;
@@ -433,7 +465,7 @@ export class DashboardFormController extends FormController {
                     displayVal = val;
                 }
                 
-                html += `<td class="${alignClass}">${displayVal}</td>`;
+                html += `<td class="${alignClass}" style="${cellStyle}">${displayVal}</td>`;
             }
             html += '</tr>';
         }
@@ -443,7 +475,8 @@ export class DashboardFormController extends FormController {
         
         // Afficher le compteur seulement si show_record_count est True
         if (data.show_record_count !== false && data.count !== undefined) {
-            html += `<div class="text-muted small p-2 border-top">Total: ${data.count} enregistrement(s)</div>`;
+            const countLabel = isGrouped ? 'Total enregistrements' : 'Total';
+            html += `<div class="text-muted small p-2 border-top">${countLabel}: ${data.count} enregistrement(s)</div>`;
         }
         
         container.innerHTML = html;

@@ -126,7 +126,8 @@ class TableauDeBordController(http.Controller):
                     'search_default_view_type', 'graph_chart_type', 'graph_aggregator', 'graph_show_legend', 'show_data_title', 'show_record_count',
                     'pivot_row_groupby', 'pivot_column_groupby', 'pivot_measures',
                     'pivot_sort_by', 'pivot_sort_order',
-                    'graph_groupbys', 'graph_measure', 'list_fields', 'measure', 'group_by'
+                    'graph_groupbys', 'graph_measure', 'list_fields', 'measure', 'group_by',
+                    'list_groupby'
                 }
                 for k, v in overrides.items():
                     if k in ('display_mode',):
@@ -176,15 +177,28 @@ class TableauDeBordController(http.Controller):
         return 'list'
 
     def _get_list_data(self, model, filter_obj, domain, context, line=None):
-        """Génère les données pour une vue liste"""
+        """Génère les données pour une vue liste
+        
+        Si un regroupement (list_groupby) est défini, affiche une ligne par groupe
+        avec les totaux des champs numériques visibles.
+        """
         # Déterminer la limite et show_record_count
         limit = 50  # Valeur par défaut
         show_record_count = context.get('show_record_count', True)
+        list_groupby = None  # Regroupement pour le mode liste
+        
+        # Priorité au contexte (overrides JS), sinon la ligne
+        if context.get('list_groupby'):
+            list_groupby_str = context.get('list_groupby')
+            if isinstance(list_groupby_str, str) and list_groupby_str.strip():
+                list_groupby = [g.strip() for g in list_groupby_str.split(',') if g.strip()]
         
         if line and hasattr(line, 'limit') and line.limit > 0:
             limit = line.limit
         if line and hasattr(line, 'show_record_count'):
             show_record_count = line.show_record_count
+        if not list_groupby and line and hasattr(line, 'list_groupby') and line.list_groupby:
+            list_groupby = [g.strip() for g in line.list_groupby.split(',') if g.strip()]
         
         # 1) Priorité 1: Champs configurés dans la ligne du tableau de bord (field_ids)
         line_id = context.get('line_id')
@@ -260,6 +274,15 @@ class TableauDeBordController(http.Controller):
         # Récupérer les métadonnées complètes des champs pour le formatage
         fields_def = model.fields_get(fields_to_display)
         
+        # Si regroupement défini, utiliser read_group au lieu de search/read
+        if list_groupby:
+            return self._get_grouped_list_data(
+                model, filter_obj, domain, context, line,
+                list_groupby, fields_to_display, field_labels, fields_def,
+                order_string, limit, show_record_count
+            )
+        
+        # Mode normal sans regroupement
         # Appliquer le tri si défini
         if order_string:
             recs = model.search(domain, limit=limit, order=order_string)
@@ -313,6 +336,378 @@ class TableauDeBordController(http.Controller):
             'data': data,
             'fields': fields_meta,
             'model': filter_obj.model_id,
+        }
+        
+        # Ajouter le compteur seulement si show_record_count est True
+        if show_record_count:
+            result['count'] = model.search_count(domain)
+            result['show_record_count'] = True
+        else:
+            result['show_record_count'] = False
+        
+        return result
+    
+    def _get_grouped_list_data(self, model, filter_obj, domain, context, line,
+                                list_groupby, fields_to_display, field_labels, fields_def,
+                                order_string, limit, show_record_count):
+        """Génère les données groupées pour une vue liste avec regroupement hiérarchique
+        
+        Si plusieurs niveaux de regroupement, affiche :
+        - Une ligne de total par groupe de niveau 1 (ex: Secteur)
+        - En dessous, les lignes de détail du niveau 2 (ex: Partner) avec la colonne niveau 1 vide
+        """
+        _logger.info(f"\n{'='*80}")
+        _logger.info(f"[LIST GROUPED] Regroupement par: {list_groupby}")
+        _logger.info(f"[LIST GROUPED] Champs à afficher: {fields_to_display}")
+        _logger.info(f"[LIST GROUPED] Tri demandé: {order_string}")
+        
+        # Parser order_string pour le tri après read_group
+        # Format: "field1 asc, field2 desc"
+        sort_config = []
+        if order_string:
+            for part in order_string.split(','):
+                part = part.strip()
+                if ' ' in part:
+                    field_name, direction = part.rsplit(' ', 1)
+                    sort_config.append({
+                        'field': field_name.strip(),
+                        'reverse': direction.lower() == 'desc'
+                    })
+                elif part:
+                    sort_config.append({'field': part, 'reverse': False})
+        _logger.info(f"[LIST GROUPED] Configuration tri parsée: {sort_config}")
+        
+        # Identifier les champs numériques visibles ET stockés en base
+        numeric_fields = []
+        numeric_types = ['integer', 'float', 'monetary']
+        
+        for fname in fields_to_display:
+            field_info = fields_def.get(fname, {})
+            # Vérifier que le champ est numérique ET stocké (store=True)
+            if field_info.get('type') in numeric_types:
+                # Vérifier si le champ est stocké (par défaut True, sauf si explicitement False)
+                is_stored = field_info.get('store', True)
+                if is_stored:
+                    numeric_fields.append(fname)
+                else:
+                    _logger.info(f"[LIST GROUPED] Champ {fname} ignoré car non stocké (compute sans store)")
+        
+        _logger.info(f"[LIST GROUPED] Champs numériques stockés: {numeric_fields}")
+        
+        # Construire les champs pour read_group (agrégation sum des champs numériques)
+        read_group_fields = []
+        for fname in numeric_fields:
+            read_group_fields.append(f"{fname}:sum")
+        
+        # Si aucun champ numérique, utiliser __count
+        if not read_group_fields:
+            read_group_fields = ['__count']
+        
+        _logger.info(f"[LIST GROUPED] Champs read_group: {read_group_fields}")
+        
+        # Récupérer les mappings pour les champs Selection
+        selection_maps = {}
+        groupby_base_fields = [gb.split(':')[0] for gb in list_groupby]
+        for gb in list_groupby:
+            base_field = gb.split(':')[0]
+            selection_maps[base_field] = self._get_selection_map(model, base_field)
+        
+        # Fonction helper pour extraire le libellé d'une valeur de regroupement
+        def get_groupby_label(gb, value):
+            base_field = gb.split(':')[0]
+            if isinstance(value, (list, tuple)) and len(value) > 1:
+                return value[1]  # [id, display_name]
+            elif selection_maps.get(base_field) and value in selection_maps[base_field]:
+                return selection_maps[base_field][value]
+            else:
+                return str(value) if value is not None else 'Non défini'
+        
+        # Fonction helper pour extraire les valeurs numériques d'un résultat read_group
+        def get_numeric_values(r):
+            values = {}
+            for fname in numeric_fields:
+                values[fname] = r.get(fname) or r.get(f"{fname}_sum") or 0
+            values['__count'] = r.get('__count', 0)
+            return values
+        
+        data = []
+        
+        if len(list_groupby) >= 2:
+            # Mode hiérarchique : regroupement sur plusieurs niveaux
+            first_gb = list_groupby[0]
+            first_base = first_gb.split(':')[0]
+            
+            # 1) Récupérer les totaux du premier niveau (ex: par Secteur)
+            try:
+                level1_results = model.read_group(
+                    domain,
+                    fields=read_group_fields,
+                    groupby=[first_gb],
+                    lazy=False
+                )
+                _logger.info(f"[LIST GROUPED] Niveau 1 ({first_gb}): {len(level1_results)} résultats")
+            except Exception as e:
+                _logger.error(f"[LIST GROUPED] Erreur read_group niveau 1: {e}")
+                level1_results = []
+            
+            # 2) Récupérer les détails du deuxième niveau (ex: par Secteur + Partner)
+            try:
+                level2_results = model.read_group(
+                    domain,
+                    fields=read_group_fields,
+                    groupby=list_groupby,
+                    lazy=False
+                )
+                _logger.info(f"[LIST GROUPED] Niveau 2 ({list_groupby}): {len(level2_results)} résultats")
+            except Exception as e:
+                _logger.error(f"[LIST GROUPED] Erreur read_group niveau 2: {e}")
+                level2_results = []
+            
+            # Appliquer le tri sur les résultats de niveau 1 si configuré
+            # On peut trier sur les champs numériques ET sur le champ de regroupement niveau 1
+            if sort_config and level1_results:
+                _logger.info(f"[LIST GROUPED] Tri niveau 1: {sort_config}")
+                # Filtrer les critères de tri pour ne garder que les champs pertinents
+                # (champs numériques OU premier champ de regroupement)
+                valid_sort_fields = numeric_fields + [first_base]
+                level1_sort_config = [cfg for cfg in sort_config if cfg['field'] in valid_sort_fields]
+                
+                if level1_sort_config:
+                    for cfg in reversed(level1_sort_config):
+                        field_name = cfg['field']
+                        reverse = cfg['reverse']
+                        
+                        def get_val_l1(row, fn=field_name, fb=first_base):
+                            # Si c'est le champ de regroupement, utiliser le libellé
+                            if fn == fb:
+                                val = row.get(fn) or row.get(f"{fn}_sum")
+                                # Pour les many2one, la valeur est (id, name)
+                                if isinstance(val, (list, tuple)) and len(val) > 1:
+                                    return str(val[1]).lower()
+                                return str(val).lower() if val else ''
+                            # Sinon c'est un champ numérique
+                            val = row.get(fn) or row.get(f"{fn}_sum") or 0
+                            if isinstance(val, (int, float)):
+                                return val
+                            return 0
+                        
+                        try:
+                            level1_results.sort(key=get_val_l1, reverse=reverse)
+                        except Exception as e:
+                            _logger.error(f"[LIST GROUPED] Erreur tri niveau 1 sur {field_name}: {e}")
+            
+            # 3) Organiser les données niveau 2 par valeur du niveau 1
+            level2_by_level1 = {}
+            for r in level2_results:
+                # Clé du niveau 1
+                val1 = r.get(first_gb) or r.get(first_base)
+                if isinstance(val1, (list, tuple)):
+                    key1 = val1[0] if val1 else None  # Utiliser l'ID comme clé
+                else:
+                    key1 = val1
+                
+                if key1 not in level2_by_level1:
+                    level2_by_level1[key1] = []
+                level2_by_level1[key1].append(r)
+            
+            # Trier les détails de niveau 2 par groupe si tri configuré
+            # On peut trier sur les champs numériques ET sur les champs de regroupement niveau 2+
+            other_groupby_fields = [gb.split(':')[0] for gb in list_groupby[1:]]
+            valid_sort_fields_l2 = numeric_fields + other_groupby_fields
+            level2_sort_config = [cfg for cfg in sort_config if cfg['field'] in valid_sort_fields_l2]
+            
+            if level2_sort_config:
+                for key1 in level2_by_level1:
+                    details = level2_by_level1[key1]
+                    for cfg in reversed(level2_sort_config):
+                        field_name = cfg['field']
+                        reverse = cfg['reverse']
+                        
+                        def get_val_l2(row, fn=field_name, ogf=other_groupby_fields):
+                            # Si c'est un champ de regroupement, utiliser le libellé
+                            if fn in ogf:
+                                val = row.get(fn)
+                                # Pour les many2one, la valeur est (id, name)
+                                if isinstance(val, (list, tuple)) and len(val) > 1:
+                                    return str(val[1]).lower()
+                                return str(val).lower() if val else ''
+                            # Sinon c'est un champ numérique
+                            val = row.get(fn) or row.get(f"{fn}_sum") or 0
+                            if isinstance(val, (int, float)):
+                                return val
+                            return 0
+                        
+                        try:
+                            details.sort(key=get_val_l2, reverse=reverse)
+                        except Exception as e:
+                            _logger.error(f"[LIST GROUPED] Erreur tri niveau 2 sur {field_name}: {e}")
+            
+            # 4) Construire les données hiérarchiques
+            for r1 in level1_results:
+                val1 = r1.get(first_gb) or r1.get(first_base)
+                if isinstance(val1, (list, tuple)):
+                    key1 = val1[0] if val1 else None
+                else:
+                    key1 = val1
+                
+                label1 = get_groupby_label(first_gb, val1)
+                
+                # Ligne de total du niveau 1 (Secteur)
+                row_total = {
+                    first_base: label1,
+                    '_is_group_header': True,  # Marqueur pour le style
+                    '_group_level': 1,
+                }
+                # Les autres colonnes de regroupement sont vides pour la ligne de total
+                for gb in list_groupby[1:]:
+                    base_field = gb.split(':')[0]
+                    row_total[base_field] = ''
+                
+                # Ajouter les valeurs numériques (totaux du niveau 1)
+                row_total.update(get_numeric_values(r1))
+                data.append(row_total)
+                
+                # Lignes de détail du niveau 2 (Partners de ce Secteur)
+                details = level2_by_level1.get(key1, [])
+                for r2 in details:
+                    row_detail = {
+                        first_base: '',  # Colonne niveau 1 vide
+                        '_is_group_header': False,
+                        '_group_level': 2,
+                    }
+                    # Remplir les colonnes des autres niveaux de regroupement
+                    for gb in list_groupby[1:]:
+                        base_field = gb.split(':')[0]
+                        val = r2.get(gb) or r2.get(base_field)
+                        row_detail[base_field] = get_groupby_label(gb, val)
+                    
+                    # Ajouter les valeurs numériques
+                    row_detail.update(get_numeric_values(r2))
+                    data.append(row_detail)
+        
+        else:
+            # Mode simple : un seul niveau de regroupement
+            try:
+                results = model.read_group(
+                    domain,
+                    fields=read_group_fields,
+                    groupby=list_groupby,
+                    lazy=False
+                )
+                _logger.info(f"[LIST GROUPED] read_group retourné {len(results)} résultats")
+            except Exception as e:
+                _logger.error(f"[LIST GROUPED] Erreur read_group: {e}")
+                results = []
+            
+            for r in results:
+                row = {'_is_group_header': False, '_group_level': 1}
+                
+                # Ajouter les champs de regroupement avec leurs libellés
+                for gb in list_groupby:
+                    base_field = gb.split(':')[0]
+                    val = r.get(gb) or r.get(base_field)
+                    row[base_field] = get_groupby_label(gb, val)
+                
+                # Ajouter les valeurs numériques
+                row.update(get_numeric_values(r))
+                data.append(row)
+        
+        # Appliquer le tri si configuré (mode simple uniquement - pas en mode hiérarchique)
+        # Le tri est déjà appliqué avant pour le mode hiérarchique
+        if sort_config and data and len(list_groupby) < 2:
+            _logger.info(f"[LIST GROUPED] Application du tri: {sort_config}")
+            
+            # Trier selon le type de données
+            # Si un seul critère de tri, utiliser reverse directement
+            if len(sort_config) == 1:
+                field_name = sort_config[0]['field']
+                reverse = sort_config[0]['reverse']
+                
+                def get_sort_value(row):
+                    val = row.get(field_name, 0)
+                    if isinstance(val, (int, float)):
+                        return val
+                    return str(val).lower() if val else ''
+                
+                try:
+                    data.sort(key=get_sort_value, reverse=reverse)
+                except Exception as e:
+                    _logger.error(f"[LIST GROUPED] Erreur tri: {e}")
+            else:
+                # Tri multi-critères plus complexe
+                # On doit inverser l'ordre des critères et trier en plusieurs passes
+                for cfg in reversed(sort_config):
+                    field_name = cfg['field']
+                    reverse = cfg['reverse']
+                    
+                    def get_val(row, fn=field_name):
+                        val = row.get(fn, 0)
+                        if isinstance(val, (int, float)):
+                            return val
+                        return str(val).lower() if val else ''
+                    
+                    try:
+                        data.sort(key=get_val, reverse=reverse)
+                    except Exception as e:
+                        _logger.error(f"[LIST GROUPED] Erreur tri sur {field_name}: {e}")
+            
+            _logger.info(f"[LIST GROUPED] Tri appliqué, premiers résultats: {data[:3] if len(data) >= 3 else data}")
+        
+        # Appliquer la limite (attention : en mode hiérarchique, compter les groupes principaux)
+        # Pour l'instant, on limite le nombre total de lignes
+        if limit and limit > 0:
+            data = data[:limit]
+        
+        data = [clean_for_json(row) for row in data]
+        
+        # Récupérer les métadonnées des champs de regroupement
+        groupby_fields_def = model.fields_get(groupby_base_fields)
+        
+        # Construire les métadonnées des champs à afficher (groupement + numériques seulement)
+        fields_meta = []
+        
+        # D'abord les champs de regroupement
+        for gb in list_groupby:
+            base_field = gb.split(':')[0]
+            field_info = groupby_fields_def.get(base_field, {})
+            meta = {
+                'name': base_field,
+                'string': field_info.get('string', base_field),
+                'type': 'char',  # Afficher comme texte (le libellé)
+                'is_groupby': True,
+            }
+            fields_meta.append(meta)
+        
+        # Ensuite les champs numériques
+        for fname in numeric_fields:
+            field_info = fields_def.get(fname, {})
+            meta = {
+                'name': fname,
+                'string': field_labels.get(fname, field_info.get('string', fname)),
+                'type': field_info.get('type', 'float'),
+                'is_aggregate': True,
+            }
+            # Ajouter digits pour les champs float et monetary
+            if meta['type'] in ('float', 'monetary'):
+                digits = field_info.get('digits')
+                if digits:
+                    if isinstance(digits, (list, tuple)) and len(digits) >= 2:
+                        meta['digits'] = int(digits[1])
+                    else:
+                        meta['digits'] = 2
+                else:
+                    meta['digits'] = 2
+            fields_meta.append(meta)
+        
+        _logger.info(f"[LIST GROUPED] Champs finaux: {[m['name'] for m in fields_meta]}")
+        
+        result = {
+            'type': 'list',
+            'data': data,
+            'fields': fields_meta,
+            'model': filter_obj.model_id,
+            'is_grouped': True,
+            'groupby': list_groupby,
         }
         
         # Ajouter le compteur seulement si show_record_count est True

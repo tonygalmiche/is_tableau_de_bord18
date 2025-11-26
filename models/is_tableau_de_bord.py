@@ -173,6 +173,7 @@ class IsTableauDeBordLine(models.Model):
     pivot_show_row_totals = fields.Boolean('Afficher les totaux des lignes', default=True, help='Ajouter une colonne de total pour chaque ligne')
     pivot_show_col_totals = fields.Boolean('Afficher les totaux des colonnes', default=True, help='Ajouter une ligne de total pour chaque colonne')
     limit = fields.Integer('Limite', default=0, help='Nombre maximum de lignes à afficher (0 = toutes les lignes)')
+    list_groupby = fields.Char('Regroupement liste', help='Champs de regroupement pour le mode liste (ex: secteur_id,partner_id). Si défini, affiche une ligne par regroupement avec les totaux des champs numériques.')
     filter_domain     = fields.Char(compute='_compute_filter_domain', store=False)
     field_ids         = fields.One2many('is.tableau.de.bord.line.field', 'line_id', string='Champs de la liste', copy=True)
     model_ids         = fields.Many2many('ir.model', compute='_compute_model_ids', store=False, compute_sudo=True)
@@ -341,6 +342,15 @@ class IsTableauDeBordLine(models.Model):
                         _logger.info(f"[ONCHANGE] graph_groupbys extrait depuis pivot_row_groupby: {self.graph_groupbys}")
                     elif row_groupby:
                         self.graph_groupbys = str(row_groupby)
+                
+                # Récupérer group_by pour le mode liste
+                if 'group_by' in context:
+                    group_by = context['group_by']
+                    if isinstance(group_by, list) and group_by:
+                        self.list_groupby = ','.join(group_by)
+                        _logger.info(f"[ONCHANGE] list_groupby extrait: {self.list_groupby}")
+                    elif group_by:
+                        self.list_groupby = str(group_by)
             
             except Exception as e:
                 import logging
@@ -366,8 +376,19 @@ class IsTableauDeBordLine(models.Model):
         if self.display_mode == 'list' and self.filter_id:
             self._load_list_fields()
 
+    @api.onchange('list_groupby')
+    def _onchange_list_groupby(self):
+        """Recharger les champs de la liste lorsque list_groupby change"""
+        if self.display_mode == 'list' and self.filter_id:
+            self._load_list_fields()
+
     def _load_list_fields(self):
-        """Charge les champs de la vue liste par défaut ou depuis le filtre"""
+        """Charge les champs de la vue liste par défaut ou depuis le filtre
+        
+        Si list_groupby est défini, filtre pour ne garder que :
+        - Les champs de regroupement
+        - Les champs numériques (integer, float, monetary) stockés pour les totaux
+        """
         # Supprimer les champs existants
         self.field_ids = [(5, 0, 0)]
         
@@ -405,6 +426,30 @@ class IsTableauDeBordLine(models.Model):
         
         # Filtrer les champs valides (qui existent réellement dans le modèle)
         valid_field_names = [fname for fname in field_names if fname and fname in model._fields]
+        
+        # Si regroupement défini, filtrer pour ne garder que les champs pertinents
+        if self.list_groupby:
+            groupby_fields = [f.strip().split(':')[0] for f in self.list_groupby.split(',') if f.strip()]
+            filtered_fields = []
+            
+            # Parcourir les champs dans l'ordre original de la vue
+            for fname in valid_field_names:
+                field = model._fields.get(fname)
+                if not field:
+                    continue
+                # Garder si c'est un champ de regroupement
+                if fname in groupby_fields:
+                    filtered_fields.append(fname)
+                # Garder si c'est un champ numérique stocké
+                elif field.type in ('integer', 'float', 'monetary') and getattr(field, 'store', True):
+                    filtered_fields.append(fname)
+            
+            # Ajouter les champs de regroupement qui ne seraient pas dans la vue
+            for fname in groupby_fields:
+                if fname not in filtered_fields and fname in model._fields:
+                    filtered_fields.insert(0, fname)
+            
+            valid_field_names = filtered_fields
         
         # Créer les lignes de champs avec leur nom technique
         # Le libellé sera calculé automatiquement par _compute_field_label
@@ -504,6 +549,15 @@ class IsTableauDeBordLine(models.Model):
                     _logger.info(f"[EXTRACT] graph_groupbys extrait depuis pivot_row_groupby: {result['graph_groupbys']}")
                 else:
                     result['graph_groupbys'] = str(row_groupby)
+            
+            # Récupérer group_by pour le mode liste
+            if 'group_by' in context:
+                group_by = context['group_by']
+                if isinstance(group_by, list):
+                    result['list_groupby'] = ','.join(group_by)
+                    _logger.info(f"[EXTRACT] list_groupby extrait: {result['list_groupby']}")
+                elif group_by:
+                    result['list_groupby'] = str(group_by)
             
             return result
             
