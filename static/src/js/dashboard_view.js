@@ -315,16 +315,6 @@ export class DashboardFormController extends FormController {
                     // Pour les listes groupées
                     list_groupby: line.list_groupby,
                 };
-                console.log(`[TDB JS] Line ${serverLineId}:`, {
-                    name: line.name,
-                    display_mode: line.display_mode,
-                    graph_measure: line.graph_measure,
-                    graph_groupbys: line.graph_groupbys,
-                    pivot_row_groupby: line.pivot_row_groupby,
-                    pivot_col_groupby: line.pivot_col_groupby,
-                    pivot_measure: line.pivot_measure,
-                    overrides: overrides
-                });
                 await this.loadFilterData(lineRecord.id, filterId, serverLineId, overrides);
             } else {
                 this.renderError(lineRecord.id, "Aucun filtre sélectionné");
@@ -336,12 +326,9 @@ export class DashboardFormController extends FormController {
         try {
             const lid = backendLineId || lineId;
             const dashboardId = this.model?.root?.resId;
-            console.log(`[TDB JS] loadFilterData - lineId=${lineId}, filterId=${filterId}, backendLineId=${lid}`, overrides);
             const data = await rpc("/tableau_de_bord/get_filter_data/" + filterId, { line_id: lid, overrides, dashboard_id: dashboardId });
-            console.log(`[TDB JS] Données reçues pour line ${lineId}:`, data);
             this.renderFilterData(lineId, data);
         } catch (error) {
-            console.error(`[TDB JS] Erreur loadFilterData pour line ${lineId}:`, error);
             this.renderError(lineId, "Erreur lors du chargement des données: " + error.message);
         }
     }
@@ -593,14 +580,8 @@ export class DashboardFormController extends FormController {
     }
 
     renderPivotData(container, data) {
-        console.log("[TDB JS] renderPivotData appelé avec:", data);
         // Support 2D matrix: data.data = { columns: [{label}], rows: [{row, values:[]}], measure_label, row_label, col_label }
         if (data.data && data.data.columns && data.data.rows) {
-            console.log("[TDB JS] Mode pivot 2D détecté:", {
-                columns: data.data.columns?.length,
-                rows: data.data.rows?.length,
-                measure_label: data.data.measure_label
-            });
             const cols = data.data.columns;
             const rows = data.data.rows;
             const measureLabel = data.data.measure_label || 'Total';

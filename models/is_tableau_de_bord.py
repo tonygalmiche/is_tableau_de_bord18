@@ -235,11 +235,6 @@ class IsTableauDeBordLine(models.Model):
     @api.onchange('filter_id')
     def _onchange_filter_id(self):
         """Remplir automatiquement le nom, le modèle et l'utilisateur avec ceux du filtre"""
-        import logging
-        _logger = logging.getLogger(__name__)
-        _logger.info(f"\n{'='*80}")
-        _logger.info(f"[ONCHANGE] _onchange_filter_id appelé - filter_id={self.filter_id.id if self.filter_id else None}")
-        
         if not self.filter_id:
             # Si on désélectionne le filtre, vider la liste des champs
             if self.display_mode == 'list':
@@ -247,9 +242,6 @@ class IsTableauDeBordLine(models.Model):
             return
             
         self.name = self.filter_id.name
-        
-        _logger.info(f"[ONCHANGE] Filter context brut: {self.filter_id.context}")
-        _logger.info(f"[ONCHANGE] Filter is_view_type: {self.filter_id.is_view_type}")
 
         # Mettre à jour le modèle si pas encore défini
         if not self.model_id:
@@ -272,12 +264,6 @@ class IsTableauDeBordLine(models.Model):
                 context_str = self.filter_id.context.replace('false', 'False').replace('true', 'True').replace('null', 'None')
                 context = ast.literal_eval(context_str) if isinstance(context_str, str) else self.filter_id.context
                 
-                # Log pour déboguer
-                import logging
-                _logger = logging.getLogger(__name__)
-                _logger.info(f"[ONCHANGE] filter_id={self.filter_id.id}, context={context}")
-                _logger.info(f"[ONCHANGE] display_mode={self.display_mode}")
-                
                 if not isinstance(context, dict):
                     return
                 
@@ -289,7 +275,6 @@ class IsTableauDeBordLine(models.Model):
                         self.pivot_measure = measures[0]
                     elif measures:  # Si c'est une chaîne non vide
                         self.pivot_measure = str(measures)
-                    _logger.info(f"[ONCHANGE] pivot_measure extrait: {self.pivot_measure}")
                 
                 # Récupérer pivot_row_groupby
                 if 'pivot_row_groupby' in context:
@@ -298,7 +283,6 @@ class IsTableauDeBordLine(models.Model):
                         self.pivot_row_groupby = ','.join(row_groupby)
                     elif row_groupby:  # Si c'est une chaîne non vide
                         self.pivot_row_groupby = str(row_groupby)
-                    _logger.info(f"[ONCHANGE] pivot_row_groupby extrait: {self.pivot_row_groupby}")
                 
                 # Récupérer pivot_column_groupby
                 if 'pivot_column_groupby' in context:
@@ -307,7 +291,6 @@ class IsTableauDeBordLine(models.Model):
                         self.pivot_col_groupby = ','.join(col_groupby)
                     elif col_groupby:  # Si c'est une chaîne non vide
                         self.pivot_col_groupby = str(col_groupby)
-                    _logger.info(f"[ONCHANGE] pivot_col_groupby extrait: {self.pivot_col_groupby}")
                 
                 # Extraire les paramètres graphique
                 # Récupérer graph_mode (bar, line, pie)
@@ -323,7 +306,6 @@ class IsTableauDeBordLine(models.Model):
                     if isinstance(measures, list) and measures:
                         # Pour les graphiques, prendre la première mesure
                         self.graph_measure = measures[0]
-                        _logger.info(f"[ONCHANGE] graph_measure extrait depuis pivot_measures: {self.graph_measure}")
                     elif measures:
                         self.graph_measure = str(measures)
                 
@@ -339,7 +321,6 @@ class IsTableauDeBordLine(models.Model):
                     if isinstance(row_groupby, list) and row_groupby:
                         # Pour les graphiques, utiliser le pivot_row_groupby
                         self.graph_groupbys = ','.join(row_groupby)
-                        _logger.info(f"[ONCHANGE] graph_groupbys extrait depuis pivot_row_groupby: {self.graph_groupbys}")
                     elif row_groupby:
                         self.graph_groupbys = str(row_groupby)
                 
@@ -348,14 +329,10 @@ class IsTableauDeBordLine(models.Model):
                     group_by = context['group_by']
                     if isinstance(group_by, list) and group_by:
                         self.list_groupby = ','.join(group_by)
-                        _logger.info(f"[ONCHANGE] list_groupby extrait: {self.list_groupby}")
                     elif group_by:
                         self.list_groupby = str(group_by)
             
-            except Exception as e:
-                import logging
-                _logger = logging.getLogger(__name__)
-                _logger.error(f"[ONCHANGE] Erreur lors de l'extraction du contexte: {e}")
+            except Exception:
                 pass  # En cas d'erreur de parsing, on ignore
         
         # Charger les champs de la vue si display_mode est 'list'
@@ -465,21 +442,14 @@ class IsTableauDeBordLine(models.Model):
 
     def _extract_filter_context_values(self, filter_obj):
         """Extrait les valeurs pivot/graph du contexte d'un filtre"""
-        import logging
-        _logger = logging.getLogger(__name__)
-        _logger.info(f"[EXTRACT] Extraction pour filtre {filter_obj.id if filter_obj else 'None'}")
-        
         if not filter_obj or not filter_obj.context:
-            _logger.info(f"[EXTRACT] Pas de filtre ou pas de contexte")
             return {}
         
         try:
             import ast
-            _logger.info(f"[EXTRACT] Context brut: {filter_obj.context}")
             # Remplacer les valeurs JavaScript par des valeurs Python
             context_str = filter_obj.context.replace('false', 'False').replace('true', 'True').replace('null', 'None')
             context = ast.literal_eval(context_str) if isinstance(context_str, str) else filter_obj.context
-            _logger.info(f"[EXTRACT] Context parsé: {context}")
             
             if not isinstance(context, dict):
                 return {}
@@ -489,7 +459,6 @@ class IsTableauDeBordLine(models.Model):
             # Récupérer le display_mode depuis le filtre
             if filter_obj.is_view_type:
                 result['display_mode'] = filter_obj.is_view_type
-                _logger.info(f"[EXTRACT] display_mode={result['display_mode']}")
             
             # Pour les pivots
             if 'pivot_measures' in context:
@@ -498,7 +467,6 @@ class IsTableauDeBordLine(models.Model):
                     result['pivot_measure'] = measures[0]
                 else:
                     result['pivot_measure'] = str(measures)
-                _logger.info(f"[EXTRACT] pivot_measure={result.get('pivot_measure')}")
             
             if 'pivot_row_groupby' in context:
                 row_groupby = context['pivot_row_groupby']
@@ -506,7 +474,6 @@ class IsTableauDeBordLine(models.Model):
                     result['pivot_row_groupby'] = ','.join(row_groupby)
                 else:
                     result['pivot_row_groupby'] = str(row_groupby)
-                _logger.info(f"[EXTRACT] pivot_row_groupby={result.get('pivot_row_groupby')}")
             
             if 'pivot_column_groupby' in context:
                 col_groupby = context['pivot_column_groupby']
@@ -514,9 +481,6 @@ class IsTableauDeBordLine(models.Model):
                     result['pivot_col_groupby'] = ','.join(col_groupby)
                 else:
                     result['pivot_col_groupby'] = str(col_groupby)
-                _logger.info(f"[EXTRACT] pivot_col_groupby={result.get('pivot_col_groupby')}")
-            
-            _logger.info(f"[EXTRACT] Résultat final: {result}")
             
             # Pour les graphiques, extraire aussi depuis les paramètres pivot
             if 'graph_mode' in context:
@@ -531,7 +495,6 @@ class IsTableauDeBordLine(models.Model):
                 measures = context['pivot_measures']
                 if isinstance(measures, list) and measures:
                     result['graph_measure'] = measures[0]
-                    _logger.info(f"[EXTRACT] graph_measure extrait depuis pivot_measures: {result['graph_measure']}")
                 else:
                     result['graph_measure'] = str(measures)
             
@@ -546,7 +509,6 @@ class IsTableauDeBordLine(models.Model):
                 row_groupby = context['pivot_row_groupby']
                 if isinstance(row_groupby, list):
                     result['graph_groupbys'] = ','.join(row_groupby)
-                    _logger.info(f"[EXTRACT] graph_groupbys extrait depuis pivot_row_groupby: {result['graph_groupbys']}")
                 else:
                     result['graph_groupbys'] = str(row_groupby)
             
@@ -555,75 +517,28 @@ class IsTableauDeBordLine(models.Model):
                 group_by = context['group_by']
                 if isinstance(group_by, list):
                     result['list_groupby'] = ','.join(group_by)
-                    _logger.info(f"[EXTRACT] list_groupby extrait: {result['list_groupby']}")
                 elif group_by:
                     result['list_groupby'] = str(group_by)
             
             return result
             
-        except Exception as e:
-            _logger.error(f"[EXTRACT] Erreur: {e}")
-            return {}
-            if 'graph_mode' in context:
-                graph_mode = context['graph_mode']
-                if graph_mode in ['bar', 'line', 'pie']:
-                    result['graph_chart_type'] = graph_mode
-            
-            # Récupérer graph_measure (priorité) sinon pivot_measures
-            if 'graph_measure' in context:
-                result['graph_measure'] = context['graph_measure']
-            elif 'pivot_measures' in context and 'graph_measure' not in result:
-                measures = context['pivot_measures']
-                if isinstance(measures, list) and measures:
-                    result['graph_measure'] = measures[0]
-                    _logger.info(f"[EXTRACT] graph_measure extrait depuis pivot_measures: {result['graph_measure']}")
-                else:
-                    result['graph_measure'] = str(measures)
-            
-            # Récupérer graph_groupbys (priorité) sinon pivot_row_groupby
-            if 'graph_groupbys' in context:
-                groupbys = context['graph_groupbys']
-                if isinstance(groupbys, list):
-                    result['graph_groupbys'] = ','.join(groupbys)
-                else:
-                    result['graph_groupbys'] = str(groupbys)
-            elif 'pivot_row_groupby' in context and 'graph_groupbys' not in result:
-                row_groupby = context['pivot_row_groupby']
-                if isinstance(row_groupby, list):
-                    result['graph_groupbys'] = ','.join(row_groupby)
-                    _logger.info(f"[EXTRACT] graph_groupbys extrait depuis pivot_row_groupby: {result['graph_groupbys']}")
-                else:
-                    result['graph_groupbys'] = str(row_groupby)
-            
-            return result
-            
-        except Exception as e:
-            _logger.error(f"[EXTRACT] Erreur: {e}")
+        except Exception:
             return {}
 
     @api.model_create_multi
     def create(self, vals_list):
         """Surcharge create pour extraire automatiquement les valeurs du filtre"""
-        import logging
-        _logger = logging.getLogger(__name__)
-        
         for vals in vals_list:
-            _logger.info(f"[CREATE] Création ligne avec filter_id={vals.get('filter_id')}")
-            _logger.info(f"[CREATE] Valeurs initiales: pivot_row_groupby={vals.get('pivot_row_groupby')}, pivot_col_groupby={vals.get('pivot_col_groupby')}, pivot_measure={vals.get('pivot_measure')}")
-            
             if vals.get('filter_id'):
                 # Extraire les valeurs du contexte du filtre
                 filter_obj = self.env['ir.filters'].browse(vals['filter_id'])
-                _logger.info(f"[CREATE] Extraction depuis filtre: {filter_obj.name} (context={filter_obj.context})")
                 
                 extracted = self._extract_filter_context_values(filter_obj)
-                _logger.info(f"[CREATE] Valeurs extraites: {extracted}")
                 
                 # Appliquer TOUTES les valeurs extraites (même si des valeurs existent déjà)
                 for key, value in extracted.items():
                     if value:  # Seulement si la valeur extraite n'est pas vide
                         vals[key] = value
-                        _logger.info(f"[CREATE] Application: {key}={value}")
         
         return super().create(vals_list)
 

@@ -36,10 +36,6 @@ class TableauDeBordController(http.Controller):
                 line_id = kwargs.get('line_id')
             overrides = kwargs.get('overrides') or {}
             
-            _logger.info(f"\n{'='*80}")
-            _logger.info(f"[TDB] get_filter_data appelé - filter_id={filter_id}, line_id={line_id}")
-            _logger.info(f"[TDB] overrides reçus: {overrides}")
-            
             filter_obj = request.env['ir.filters'].browse(filter_id)
             if not filter_obj.exists():
                 return {'error': 'Filtre non trouvé'}
@@ -137,12 +133,6 @@ class TableauDeBordController(http.Controller):
 
             # Déterminer le type de vue à utiliser
             view_type = self._get_view_type_from_context(ctx)
-            
-            _logger.info(f"[TDB] view_type déterminé: {view_type}")
-            _logger.info(f"[TDB] contexte final - pivot_column_groupby: {ctx.get('pivot_column_groupby')}")
-            _logger.info(f"[TDB] contexte final - pivot_col_groupby: {ctx.get('pivot_col_groupby')}")
-            _logger.info(f"[TDB] contexte final - pivot_row_groupby: {ctx.get('pivot_row_groupby')}")
-            _logger.info(f"[TDB] contexte final - pivot_measures: {ctx.get('pivot_measures')}")
 
             model = model.with_context(ctx)
             if view_type == 'graph':
@@ -356,11 +346,6 @@ class TableauDeBordController(http.Controller):
         - Une ligne de total par groupe de niveau 1 (ex: Secteur)
         - En dessous, les lignes de détail du niveau 2 (ex: Partner) avec la colonne niveau 1 vide
         """
-        _logger.info(f"\n{'='*80}")
-        _logger.info(f"[LIST GROUPED] Regroupement par: {list_groupby}")
-        _logger.info(f"[LIST GROUPED] Champs à afficher: {fields_to_display}")
-        _logger.info(f"[LIST GROUPED] Tri demandé: {order_string}")
-        
         # Parser order_string pour le tri après read_group
         # Format: "field1 asc, field2 desc"
         sort_config = []
@@ -375,7 +360,6 @@ class TableauDeBordController(http.Controller):
                     })
                 elif part:
                     sort_config.append({'field': part, 'reverse': False})
-        _logger.info(f"[LIST GROUPED] Configuration tri parsée: {sort_config}")
         
         # Identifier les champs numériques visibles ET stockés en base
         numeric_fields = []
@@ -389,10 +373,6 @@ class TableauDeBordController(http.Controller):
                 is_stored = field_info.get('store', True)
                 if is_stored:
                     numeric_fields.append(fname)
-                else:
-                    _logger.info(f"[LIST GROUPED] Champ {fname} ignoré car non stocké (compute sans store)")
-        
-        _logger.info(f"[LIST GROUPED] Champs numériques stockés: {numeric_fields}")
         
         # Construire les champs pour read_group (agrégation sum des champs numériques)
         read_group_fields = []
@@ -402,8 +382,6 @@ class TableauDeBordController(http.Controller):
         # Si aucun champ numérique, utiliser __count
         if not read_group_fields:
             read_group_fields = ['__count']
-        
-        _logger.info(f"[LIST GROUPED] Champs read_group: {read_group_fields}")
         
         # Récupérer les mappings pour les champs Selection
         selection_maps = {}
@@ -445,9 +423,7 @@ class TableauDeBordController(http.Controller):
                     groupby=[first_gb],
                     lazy=False
                 )
-                _logger.info(f"[LIST GROUPED] Niveau 1 ({first_gb}): {len(level1_results)} résultats")
             except Exception as e:
-                _logger.error(f"[LIST GROUPED] Erreur read_group niveau 1: {e}")
                 level1_results = []
             
             # 2) Récupérer les détails du deuxième niveau (ex: par Secteur + Partner)
@@ -458,15 +434,12 @@ class TableauDeBordController(http.Controller):
                     groupby=list_groupby,
                     lazy=False
                 )
-                _logger.info(f"[LIST GROUPED] Niveau 2 ({list_groupby}): {len(level2_results)} résultats")
             except Exception as e:
-                _logger.error(f"[LIST GROUPED] Erreur read_group niveau 2: {e}")
                 level2_results = []
             
             # Appliquer le tri sur les résultats de niveau 1 si configuré
             # On peut trier sur les champs numériques ET sur le champ de regroupement niveau 1
             if sort_config and level1_results:
-                _logger.info(f"[LIST GROUPED] Tri niveau 1: {sort_config}")
                 # Filtrer les critères de tri pour ne garder que les champs pertinents
                 # (champs numériques OU premier champ de regroupement)
                 valid_sort_fields = numeric_fields + [first_base]
@@ -493,8 +466,8 @@ class TableauDeBordController(http.Controller):
                         
                         try:
                             level1_results.sort(key=get_val_l1, reverse=reverse)
-                        except Exception as e:
-                            _logger.error(f"[LIST GROUPED] Erreur tri niveau 1 sur {field_name}: {e}")
+                        except Exception:
+                            pass
             
             # 3) Organiser les données niveau 2 par valeur du niveau 1
             level2_by_level1 = {}
@@ -539,8 +512,8 @@ class TableauDeBordController(http.Controller):
                         
                         try:
                             details.sort(key=get_val_l2, reverse=reverse)
-                        except Exception as e:
-                            _logger.error(f"[LIST GROUPED] Erreur tri niveau 2 sur {field_name}: {e}")
+                        except Exception:
+                            pass
             
             # 4) Construire les données hiérarchiques
             for r1 in level1_results:
@@ -594,9 +567,7 @@ class TableauDeBordController(http.Controller):
                     groupby=list_groupby,
                     lazy=False
                 )
-                _logger.info(f"[LIST GROUPED] read_group retourné {len(results)} résultats")
-            except Exception as e:
-                _logger.error(f"[LIST GROUPED] Erreur read_group: {e}")
+            except Exception:
                 results = []
             
             for r in results:
@@ -615,8 +586,6 @@ class TableauDeBordController(http.Controller):
         # Appliquer le tri si configuré (mode simple uniquement - pas en mode hiérarchique)
         # Le tri est déjà appliqué avant pour le mode hiérarchique
         if sort_config and data and len(list_groupby) < 2:
-            _logger.info(f"[LIST GROUPED] Application du tri: {sort_config}")
-            
             # Trier selon le type de données
             # Si un seul critère de tri, utiliser reverse directement
             if len(sort_config) == 1:
@@ -631,8 +600,8 @@ class TableauDeBordController(http.Controller):
                 
                 try:
                     data.sort(key=get_sort_value, reverse=reverse)
-                except Exception as e:
-                    _logger.error(f"[LIST GROUPED] Erreur tri: {e}")
+                except Exception:
+                    pass
             else:
                 # Tri multi-critères plus complexe
                 # On doit inverser l'ordre des critères et trier en plusieurs passes
@@ -648,10 +617,8 @@ class TableauDeBordController(http.Controller):
                     
                     try:
                         data.sort(key=get_val, reverse=reverse)
-                    except Exception as e:
-                        _logger.error(f"[LIST GROUPED] Erreur tri sur {field_name}: {e}")
-            
-            _logger.info(f"[LIST GROUPED] Tri appliqué, premiers résultats: {data[:3] if len(data) >= 3 else data}")
+                    except Exception:
+                        pass
         
         # Appliquer la limite (attention : en mode hiérarchique, compter les groupes principaux)
         # Pour l'instant, on limite le nombre total de lignes
@@ -698,8 +665,6 @@ class TableauDeBordController(http.Controller):
                 else:
                     meta['digits'] = 2
             fields_meta.append(meta)
-        
-        _logger.info(f"[LIST GROUPED] Champs finaux: {[m['name'] for m in fields_meta]}")
         
         result = {
             'type': 'list',
@@ -975,15 +940,6 @@ class TableauDeBordController(http.Controller):
         if isinstance(col_gb, list):
             col_gb = col_gb[0] if col_gb else None
         
-        # Log pour débogage
-        _logger.info(f"\n{'='*80}")
-        _logger.info(f"[PIVOT] Entrée dans _get_pivot_data")
-        _logger.info(f"[PIVOT] Contexte complet: {context}")
-        _logger.info(f"[PIVOT] row_gb extrait={row_gb}")
-        _logger.info(f"[PIVOT] col_gb extrait={col_gb}")
-        _logger.info(f"[PIVOT] pivot_column_groupby brut={context.get('pivot_column_groupby')}")
-        _logger.info(f"[PIVOT] pivot_col_groupby brut={context.get('pivot_col_groupby')}")
-        
         # Pour la mesure, utiliser graph_measure du contexte si pivot_measures n'est pas défini
         measures = context.get('pivot_measures') or context.get('graph_measure') or context.get('measure')
         if isinstance(measures, list):
@@ -992,8 +948,6 @@ class TableauDeBordController(http.Controller):
             measure = measures
 
         use_count = not measure or str(measure) in ('count', '__count')
-        
-        _logger.info(f"[PIVOT] measure={measure}, use_count={use_count}")
         fields = [] if use_count else [f"{measure}:sum"]
         
         # Récupérer le libellé de la mesure
@@ -1025,13 +979,9 @@ class TableauDeBordController(http.Controller):
 
         if row_gb and col_gb:
             # 2D pivot
-            _logger.info(f"[PIVOT] Mode 2D détecté: row_gb={row_gb}, col_gb={col_gb}")
-            _logger.info(f"[PIVOT] Paramètres read_group: domain={domain}, fields={fields or ['__count']}, groupby=[{row_gb}, {col_gb}]")
             # Ne pas appliquer la limite au read_group, on triera et limitera après
             try:
                 results = model.read_group(domain, fields=fields or ["__count"], groupby=[row_gb, col_gb], lazy=False)
-                _logger.info(f"[PIVOT] read_group retourné {len(results)} résultats")
-                _logger.info(f"[PIVOT] Premier résultat (si existe): {results[0] if results else 'VIDE'}")
             except Exception:
                 results = []
             
@@ -1115,7 +1065,6 @@ class TableauDeBordController(http.Controller):
             return result
 
         # 1D pivot (lignes uniquement)
-        _logger.info(f"[PIVOT] Mode 1D: row_gb={row_gb}, pas de col_gb")
         data_rows = []
         if row_gb:
             # Récupérer le mapping pour les champs Selection
@@ -1124,7 +1073,6 @@ class TableauDeBordController(http.Controller):
             # Ne pas appliquer la limite au read_group, on triera et limitera après
             try:
                 results = model.read_group(domain, fields=fields or ["__count"], groupby=[row_gb], lazy=False)
-                _logger.info(f"[PIVOT] 1D - read_group retourné {len(results)} résultats")
                 for r in results:
                     label = self._extract_label_from_record(r, row_gb, row_selection_map)
                     value = (r.get('__count') if use_count else (r.get(f"{measure}_sum") or r.get(measure))) or 0
