@@ -479,13 +479,52 @@ class TableauDeBordController(http.Controller):
     def _sort_key_smart(self, label):
         """Génère une clé de tri intelligente (numérique si possible, sinon alphabétique)"""
         if label is None:
-            return (1, '')  # Les None à la fin
+            return (2, '')  # Les None à la fin
+        
+        label_str = str(label)
+        
+        # Mapping des mois français vers leur numéro
+        french_months = {
+            'janvier': 1, 'février': 2, 'mars': 3, 'avril': 4, 'mai': 5, 'juin': 6,
+            'juillet': 7, 'août': 8, 'septembre': 9, 'octobre': 10, 'novembre': 11, 'décembre': 12
+        }
+        
+        # Détecter les dates au format "mois YYYY" (groupement date:month en français)
+        # Ex: "janvier 2025", "février 2025", etc.
+        import re
+        french_month_match = re.match(r'^(\w+)\s+(\d{4})$', label_str, re.IGNORECASE)
+        if french_month_match:
+            month_name, year = french_month_match.groups()
+            month_name_lower = month_name.lower()
+            if month_name_lower in french_months:
+                # Retourner une clé de tri : (0, année, mois) pour tri chronologique
+                return (0, int(year), french_months[month_name_lower])
+        
+        # Détecter les dates au format "MM/YYYY" (groupement date:month numérique)
+        # Ex: "01/2024", "02/2024", etc.
+        month_match = re.match(r'^(\d{2})/(\d{4})$', label_str)
+        if month_match:
+            month, year = month_match.groups()
+            # Retourner une clé de tri : (0, année, mois) pour tri chronologique
+            return (0, int(year), int(month))
+        
+        # Détecter les dates au format "YYYY" (groupement date:year)
+        year_match = re.match(r'^(\d{4})$', label_str)
+        if year_match:
+            return (0, int(year_match.group(1)), 0)
+        
+        # Détecter les dates au format "Q1/2024", "Q2/2024" (groupement date:quarter)
+        quarter_match = re.match(r'^Q(\d)/(\d{4})$', label_str)
+        if quarter_match:
+            quarter, year = quarter_match.groups()
+            return (0, int(year), 0, int(quarter))
+        
         # Essayer de convertir en nombre pour tri numérique
         try:
-            return (0, float(str(label).replace(',', '.').replace(' ', '')))
+            return (1, float(label_str.replace(',', '.').replace(' ', '')))
         except (ValueError, AttributeError):
             # Si ce n'est pas un nombre, tri alphabétique insensible à la casse
-            return (1, str(label).lower())
+            return (2, label_str.lower())
 
     def _sort_and_limit_rows(self, rows, context, limit, is_2d=False):
         """Trie et limite les lignes selon les paramètres du contexte
