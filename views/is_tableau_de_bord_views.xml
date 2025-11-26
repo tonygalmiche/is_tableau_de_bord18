@@ -96,18 +96,31 @@
                         <field name="limit"/>
                     </group>
                     <group invisible="display_mode != 'graph'">
-                        <field name="graph_chart_type"/>
-                        <field name="graph_show_legend"/>
-                        <field name="show_data_title"/>
-                        <field name="pivot_sort_by"/>
-                        <field name="pivot_sort_order"/>
+                        <group>
+                            <field name="graph_chart_type"/>
+                            <field name="graph_show_legend"/>
+                            <field name="show_data_title"/>
+                            <field name="pivot_sort_by"/>
+                            <field name="pivot_sort_order"/>
+                        </group>
+                        <group string="Paramètres techniques">
+                            <field name="graph_measure" readonly="1" force_save="1"/>
+                            <field name="graph_groupbys" readonly="1" force_save="1"/>
+                        </group>
                     </group>
-                    <group invisible="display_mode != 'pivot'" string="Options du tableau croisé">
-                        <field name="show_data_title"/>
-                        <field name="pivot_sort_by"/>
-                        <field name="pivot_sort_order"/>
-                        <field name="pivot_show_row_totals"/>
-                        <field name="pivot_show_col_totals"/>
+                    <group invisible="display_mode != 'pivot'">
+                        <group string="Options du tableau croisé">
+                            <field name="show_data_title"/>
+                            <field name="pivot_sort_by"/>
+                            <field name="pivot_sort_order"/>
+                            <field name="pivot_show_row_totals"/>
+                            <field name="pivot_show_col_totals"/>
+                        </group>
+                        <group string="Paramètres techniques">
+                            <field name="pivot_row_groupby" readonly="1" force_save="1"/>
+                            <field name="pivot_col_groupby" readonly="1" force_save="1"/>
+                            <field name="pivot_measure" readonly="1" force_save="1"/>
+                        </group>
                     </group>
                     <group invisible="display_mode != 'list'">
                         <field name="show_record_count"/>
@@ -164,6 +177,7 @@
                                 <field name="height"/>
                                 <field name="display_mode"/>
                                 <field name="graph_chart_type"/>
+                                <field name="graph_measure"/>
                                 <field name="graph_groupbys"/>
                                 <field name="graph_show_legend"/>
                                 <field name="show_data_title"/>

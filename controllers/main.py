@@ -36,6 +36,10 @@ class TableauDeBordController(http.Controller):
                 line_id = kwargs.get('line_id')
             overrides = kwargs.get('overrides') or {}
             
+            _logger.info(f"\n{'='*80}")
+            _logger.info(f"[TDB] get_filter_data appelé - filter_id={filter_id}, line_id={line_id}")
+            _logger.info(f"[TDB] overrides reçus: {overrides}")
+            
             filter_obj = request.env['ir.filters'].browse(filter_id)
             if not filter_obj.exists():
                 return {'error': 'Filtre non trouvé'}
@@ -96,7 +100,10 @@ class TableauDeBordController(http.Controller):
                             ctx['pivot_row_groupby'] = [g.strip() for g in line.pivot_row_groupby.split(',')] if ',' in line.pivot_row_groupby else [line.pivot_row_groupby]
                         if line.pivot_col_groupby:
                             # Convertir la chaîne en liste si nécessaire
-                            ctx['pivot_column_groupby'] = [g.strip() for g in line.pivot_col_groupby.split(',')] if ',' in line.pivot_col_groupby else [line.pivot_col_groupby]
+                            col_groupby_list = [g.strip() for g in line.pivot_col_groupby.split(',')] if ',' in line.pivot_col_groupby else [line.pivot_col_groupby]
+                            ctx['pivot_column_groupby'] = col_groupby_list
+                            # Garder aussi la forme simple pour compatibilité
+                            ctx['pivot_col_groupby'] = col_groupby_list
                         if line.pivot_measure:
                             # Convertir la chaîne en liste si nécessaire
                             ctx['pivot_measures'] = [g.strip() for g in line.pivot_measure.split(',')] if ',' in line.pivot_measure else [line.pivot_measure]
@@ -129,6 +136,12 @@ class TableauDeBordController(http.Controller):
 
             # Déterminer le type de vue à utiliser
             view_type = self._get_view_type_from_context(ctx)
+            
+            _logger.info(f"[TDB] view_type déterminé: {view_type}")
+            _logger.info(f"[TDB] contexte final - pivot_column_groupby: {ctx.get('pivot_column_groupby')}")
+            _logger.info(f"[TDB] contexte final - pivot_col_groupby: {ctx.get('pivot_col_groupby')}")
+            _logger.info(f"[TDB] contexte final - pivot_row_groupby: {ctx.get('pivot_row_groupby')}")
+            _logger.info(f"[TDB] contexte final - pivot_measures: {ctx.get('pivot_measures')}")
 
             model = model.with_context(ctx)
             if view_type == 'graph':
@@ -523,9 +536,19 @@ class TableauDeBordController(http.Controller):
         if isinstance(row_gb, list):
             row_gb = row_gb[0] if row_gb else None
         
-        col_gb = context.get('pivot_column_groupby')
+        # Vérifier les deux noms possibles (pivot_column_groupby du filtre et pivot_col_groupby de la ligne)
+        col_gb = context.get('pivot_column_groupby') or context.get('pivot_col_groupby')
         if isinstance(col_gb, list):
             col_gb = col_gb[0] if col_gb else None
+        
+        # Log pour débogage
+        _logger.info(f"\n{'='*80}")
+        _logger.info(f"[PIVOT] Entrée dans _get_pivot_data")
+        _logger.info(f"[PIVOT] Contexte complet: {context}")
+        _logger.info(f"[PIVOT] row_gb extrait={row_gb}")
+        _logger.info(f"[PIVOT] col_gb extrait={col_gb}")
+        _logger.info(f"[PIVOT] pivot_column_groupby brut={context.get('pivot_column_groupby')}")
+        _logger.info(f"[PIVOT] pivot_col_groupby brut={context.get('pivot_col_groupby')}")
         
         # Pour la mesure, utiliser graph_measure du contexte si pivot_measures n'est pas défini
         measures = context.get('pivot_measures') or context.get('graph_measure') or context.get('measure')
@@ -535,6 +558,8 @@ class TableauDeBordController(http.Controller):
             measure = measures
 
         use_count = not measure or str(measure) in ('count', '__count')
+        
+        _logger.info(f"[PIVOT] measure={measure}, use_count={use_count}")
         fields = [] if use_count else [f"{measure}:sum"]
         
         # Récupérer le libellé de la mesure
@@ -566,9 +591,13 @@ class TableauDeBordController(http.Controller):
 
         if row_gb and col_gb:
             # 2D pivot
+            _logger.info(f"[PIVOT] Mode 2D détecté: row_gb={row_gb}, col_gb={col_gb}")
+            _logger.info(f"[PIVOT] Paramètres read_group: domain={domain}, fields={fields or ['__count']}, groupby=[{row_gb}, {col_gb}]")
             # Ne pas appliquer la limite au read_group, on triera et limitera après
             try:
                 results = model.read_group(domain, fields=fields or ["__count"], groupby=[row_gb, col_gb], lazy=False)
+                _logger.info(f"[PIVOT] read_group retourné {len(results)} résultats")
+                _logger.info(f"[PIVOT] Premier résultat (si existe): {results[0] if results else 'VIDE'}")
             except Exception:
                 results = []
             
@@ -652,6 +681,7 @@ class TableauDeBordController(http.Controller):
             return result
 
         # 1D pivot (lignes uniquement)
+        _logger.info(f"[PIVOT] Mode 1D: row_gb={row_gb}, pas de col_gb")
         data_rows = []
         if row_gb:
             # Récupérer le mapping pour les champs Selection
@@ -660,6 +690,7 @@ class TableauDeBordController(http.Controller):
             # Ne pas appliquer la limite au read_group, on triera et limitera après
             try:
                 results = model.read_group(domain, fields=fields or ["__count"], groupby=[row_gb], lazy=False)
+                _logger.info(f"[PIVOT] 1D - read_group retourné {len(results)} résultats")
                 for r in results:
                     label = self._extract_label_from_record(r, row_gb, row_selection_map)
                     value = (r.get('__count') if use_count else (r.get(f"{measure}_sum") or r.get(measure))) or 0
