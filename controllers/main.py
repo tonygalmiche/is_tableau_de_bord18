@@ -752,7 +752,13 @@ class TableauDeBordController(http.Controller):
                 for gb in groupbys:
                     base = gb.split(':')[0]
                     val = r.get(gb) or r.get(base) or r.get(f"{gb}_name") or r.get(f"{base}_name")
-                    label_parts.append(str(val) if val is not None else '')
+                    # Pour les many2one (tuple/list), prendre le display_name (2ème élément)
+                    if isinstance(val, (list, tuple)) and len(val) > 1:
+                        label_parts.append(str(val[1]) if val[1] is not None else '')
+                    elif val is not None:
+                        label_parts.append(str(val))
+                    else:
+                        label_parts.append('')
                 label = " / ".join([p for p in label_parts if p])
                 
                 if use_count:
