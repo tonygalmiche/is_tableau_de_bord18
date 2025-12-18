@@ -4,9 +4,11 @@ import json
 import ast
 import logging
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
+from dateutil.relativedelta import relativedelta
 from odoo import http
 from odoo.http import request
+from odoo.tools.safe_eval import safe_eval, datetime as safe_datetime, time as safe_time
 from lxml import etree
 
 
@@ -316,7 +318,19 @@ class TableauDeBordController(http.Controller):
             domain = []
             if filter_obj.domain:
                 try:
-                    domain = ast.literal_eval(filter_obj.domain)
+                    # Utiliser safe_eval pour supporter les expressions dynamiques
+                    # comme context_today(), datetime.timedelta, relativedelta, etc.
+                    eval_context = {
+                        'datetime': safe_datetime,
+                        'context_today': lambda: date.today(),
+                        'current_date': date.today().strftime('%Y-%m-%d'),
+                        'time': safe_time,
+                        'relativedelta': relativedelta,
+                        'timedelta': timedelta,
+                        'uid': request.env.uid,
+                        'user': request.env.user,
+                    }
+                    domain = safe_eval(filter_obj.domain, eval_context)
                 except Exception:
                     domain = []
 
