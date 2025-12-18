@@ -292,11 +292,9 @@ export class DashboardFormController extends FormController {
     getFiltersValues() {
         // Collecter toutes les valeurs de filtres non vides
         const filtersValues = {};
-        console.log('=== getFiltersValues ===');
         document.querySelectorAll('.dashboard-filter-input').forEach(input => {
             const filterDefId = input.dataset.filterId;
             const value = input.value.trim();
-            console.log('Filter input found:', filterDefId, '=', value);
             if (value) {
                 filtersValues[filterDefId] = value;
             }
@@ -575,12 +573,6 @@ export class DashboardFormController extends FormController {
             
             // Collecter les valeurs des filtres
             const filtersValues = this.getFiltersValues();
-            
-            console.log('=== loadFilterData ===');
-            console.log('filterId:', filterId);
-            console.log('line_id:', lid);
-            console.log('dashboard_id:', dashboardId);
-            console.log('filters_values:', filtersValues);
             
             const data = await rpc("/tableau_de_bord/get_filter_data/" + filterId, { 
                 line_id: lid, 

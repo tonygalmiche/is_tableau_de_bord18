@@ -111,7 +111,7 @@
                             <list editable="bottom">
                                 <field name="sequence" widget="handle"/>
                                 <field name="filter_def_id" options="{'no_create': True}"/>
-                                <field name="field_id" options="{'no_create': True, 'no_open': True}"/>
+                                <field name="field_id" options="{'no_create': True, 'no_open': True}" domain="[('model_id', '=', parent.model_id), '|', ('selectable', '=', True), ('name', 'in', ['create_date', 'write_date', 'create_uid', 'write_uid'])]"/>
                             </list>
                         </field>
                     </group>

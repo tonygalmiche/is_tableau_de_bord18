@@ -306,12 +306,6 @@ class TableauDeBordController(http.Controller):
             dashboard_id = kwargs.get('dashboard_id')
             filters_values = kwargs.get('filters_values') or {}
             
-            print('=== get_filter_data ===')
-            print('filter_id:', filter_id)
-            print('line_id:', line_id)
-            print('dashboard_id:', dashboard_id)
-            print('filters_values:', filters_values)
-            
             filter_obj = request.env['ir.filters'].browse(filter_id)
             if not filter_obj.exists():
                 return {'error': 'Filtre non trouvé'}
@@ -327,36 +321,28 @@ class TableauDeBordController(http.Controller):
                     domain = []
 
             # Appliquer les filtres dynamiques si définis
-            print('Checking filters_values:', filters_values, 'line_id:', line_id)
             if filters_values and line_id:
                 try:
                     line = request.env['is.tableau.de.bord.line'].browse(int(line_id))
-                    print('Line found:', line.exists(), 'line_filter_ids:', line.line_filter_ids if line.exists() else 'N/A')
                     if line and line.exists() and line.line_filter_ids:
                         for line_filter in line.line_filter_ids:
                             filter_def_id = line_filter.filter_def_id.id
-                            print('Checking line_filter:', line_filter, 'filter_def_id:', filter_def_id)
                             # Convertir les clés du dictionnaire en int pour la comparaison
                             filter_value = None
                             for key, val in filters_values.items():
-                                print('  Comparing key:', key, '(', type(key), ') with filter_def_id:', filter_def_id)
                                 if int(key) == filter_def_id:
                                     filter_value = val
                                     break
                             
-                            print('filter_value for', filter_def_id, ':', filter_value)
                             if filter_value:
                                 field_name = line_filter.field_id.name
                                 field_type = line_filter.field_id.ttype
                                 filter_type = line_filter.filter_def_id.filter_type
-                                print('Applying filter on field:', field_name, 'type:', field_type, 'filter_type:', filter_type)
                                 
                                 # Utiliser le parser avancé
                                 parsed_domain = self._parse_filter_value(field_name, field_type, filter_value, filter_type)
-                                print('Parsed domain:', parsed_domain)
                                 if parsed_domain:
                                     domain.extend(parsed_domain)
-                                    print('Domain after extension:', domain)
                 except Exception:
                     import traceback
                     traceback.print_exc()
