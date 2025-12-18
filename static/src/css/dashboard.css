@@ -1,8 +1,41 @@
 /* Styles pour le tableau de bord */
 
+/* Supprimer l'espace en haut du formulaire dashboard */
+.o_dashboard_form .o_form_renderer {
+    padding-top: 0 !important;
+}
+
+.o_dashboard_form > .o_form_view {
+    padding-top: 0 !important;
+}
+
+.o_dashboard_form .o_form_sheet_bg {
+    padding-top: 0 !important;
+}
+
+.o_dashboard_form .o_content {
+    padding-top: 0 !important;
+}
+
+.o_dashboard_form .o_form_sheet {
+    padding-top: 0 !important;
+    margin-top: 0 !important;
+}
+
+/* Conteneur des filtres - toujours visible au-dessus */
+#filter_container {
+    position: sticky;
+    top: 0;
+    z-index: 1050;
+    background: #fff;
+    min-height: 34px;
+    padding: 3px 8px;
+    margin: 0 !important;
+}
+
 .o_dashboard_view {
     padding: 0;
-    margin-top: -1.5rem !important;
+    margin-top: 0 !important;
 }
 
 .dashboard-item {

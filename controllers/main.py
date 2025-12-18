@@ -3,6 +3,8 @@
 import json
 import ast
 import logging
+import re
+from datetime import datetime, timedelta
 from odoo import http
 from odoo.http import request
 from lxml import etree
@@ -27,6 +29,272 @@ def clean_for_json(obj):
 
 class TableauDeBordController(http.Controller):
 
+    def _parse_filter_value(self, field_name, field_type, filter_value, filter_type='text'):
+        """Parse une valeur de filtre avec support des opérateurs avancés
+        
+        Syntaxe supportée:
+        - Opérateur OU: virgule ou mot-clé OU (ex: "toto, tutu" ou "toto OU tutu")
+        - Opérateur ET: mot-clé ET (ex: ">100 ET <200")
+        - Wildcards: * pour texte (ex: "abc*", "*xyz", "abc*xyz")
+        - Opérateurs numériques: >, >=, <, <=, = (ex: ">100", "<=50")
+        - Opérateurs de dates: mêmes opérateurs (ex: ">2025", "<=2025-03")
+        - Booléens: 1/0, true/false, vrai/faux, yes/no, oui/non
+        """
+        if not filter_value or not filter_value.strip():
+            return []
+        
+        filter_value = filter_value.strip()
+        
+        # Gérer l'opérateur ET en priorité (car il ne peut pas être dans une valeur)
+        if ' ET ' in filter_value.upper():
+            parts = re.split(r'\s+ET\s+', filter_value, flags=re.IGNORECASE)
+            domain = []
+            for part in parts:
+                sub_domain = self._parse_filter_value(field_name, field_type, part.strip(), filter_type)
+                domain.extend(sub_domain)
+            return domain
+        
+        # Gérer l'opérateur OU (virgule ou mot-clé OU)
+        # Pour les nombres décimaux, éviter de split sur la virgule décimale
+        or_parts = []
+        if ' OU ' in filter_value.upper():
+            or_parts = re.split(r'\s+OU\s+', filter_value, flags=re.IGNORECASE)
+        elif ',' in filter_value:
+            # Vérifier si c'est un nombre décimal ou une liste
+            if field_type in ['integer', 'float', 'monetary']:
+                # Si commence par un opérateur ou contient plusieurs virgules, c'est une liste
+                if re.match(r'^[><=]', filter_value) or filter_value.count(',') > 1:
+                    or_parts = [p.strip() for p in filter_value.split(',')]
+                else:
+                    # Sinon c'est probablement un décimal unique
+                    or_parts = [filter_value]
+            else:
+                or_parts = [p.strip() for p in filter_value.split(',')]
+        else:
+            or_parts = [filter_value]
+        
+        if len(or_parts) > 1:
+            # Créer un domaine OR
+            or_domains = []
+            for part in or_parts:
+                sub_domain = self._parse_single_filter(field_name, field_type, part.strip(), filter_type)
+                if sub_domain:
+                    or_domains.append(sub_domain)
+            
+            if len(or_domains) == 0:
+                return []
+            elif len(or_domains) == 1:
+                return or_domains[0]
+            else:
+                # Construire le domaine OR en Odoo
+                # Pour n domaines, on a besoin de (n-1) opérateurs '|'
+                result = []
+                
+                # Ajouter les opérateurs OR
+                for i in range(len(or_domains) - 1):
+                    result.append('|')
+                
+                # Ajouter chaque domaine
+                for dom in or_domains:
+                    if len(dom) == 1:
+                        # Condition simple, l'ajouter directement
+                        result.append(dom[0])
+                    elif len(dom) == 2:
+                        # Deux conditions (ex: année avec >= et <=)
+                        # Il faut les grouper avec '&'
+                        result.append('&')
+                        result.extend(dom)
+                    else:
+                        # Plus de 2 conditions, ajouter des '&' pour toutes
+                        for i in range(len(dom) - 1):
+                            result.append('&')
+                        result.extend(dom)
+                
+                return result
+        else:
+            return self._parse_single_filter(field_name, field_type, filter_value, filter_type)
+    
+    def _parse_single_filter(self, field_name, field_type, filter_value, filter_type='text'):
+        """Parse une valeur de filtre unique (sans opérateurs OU/ET)"""
+        domain = []
+        
+        try:
+            # Booléen
+            if field_type == 'boolean':
+                val_lower = filter_value.lower()
+                if val_lower in ['1', 'true', 'vrai', 'yes', 'oui']:
+                    return [(field_name, '=', True)]
+                elif val_lower in ['0', 'false', 'faux', 'no', 'non']:
+                    return [(field_name, '=', False)]
+                return []
+            
+            # Numérique (integer, float, monetary)
+            if field_type in ['integer', 'float', 'monetary']:
+                return self._parse_numeric_filter(field_name, filter_value)
+            
+            # Date et Datetime
+            if field_type in ['date', 'datetime'] and filter_type == 'date':
+                return self._parse_date_filter(field_name, filter_value, is_datetime=(field_type == 'datetime'))
+            
+            # Texte (char, text, many2one, selection)
+            if field_type in ['char', 'text', 'selection']:
+                return self._parse_text_filter(field_name, filter_value)
+            
+            # Many2one
+            if field_type == 'many2one':
+                return self._parse_text_filter(field_name + '.name', filter_value)
+                
+        except Exception:
+            pass
+        
+        return domain
+    
+    def _parse_numeric_filter(self, field_name, filter_value):
+        """Parse un filtre numérique avec opérateurs"""
+        # Remplacer virgule par point pour les décimaux
+        filter_value = filter_value.replace(',', '.')
+        
+        # Détecter l'opérateur
+        match = re.match(r'^(>=?|<=?|=)?\s*(-?\d+\.?\d*)$', filter_value)
+        if match:
+            operator = match.group(1) or '='
+            value = float(match.group(2))
+            return [(field_name, operator, value)]
+        
+        return []
+    
+    def _parse_text_filter(self, field_name, filter_value):
+        """Parse un filtre texte avec wildcards"""
+        # Gérer les wildcards
+        if '*' in filter_value:
+            pattern = filter_value.replace('*', '%')
+            return [(field_name, 'ilike', pattern)]
+        else:
+            # Recherche contient par défaut (ajouter % des 2 côtés)
+            pattern = f'%{filter_value}%'
+            return [(field_name, 'ilike', pattern)]
+
+    def _parse_date_filter(self, field_name, filter_value, is_datetime=False):
+        """Parse une valeur de filtre de date avec opérateurs
+        Formats supportés:
+        - AAAA : année complète
+        - AAAA-MM : mois complet  
+        - AAAA-SXX : semaine XX de l'année
+        - JJ/MM/AAAA ou AAAA-MM-JJ : date exacte
+        - Avec opérateurs: >2025, <=2025-03, etc.
+        
+        is_datetime: si True, ajoute l'heure aux valeurs pour les champs datetime
+        """
+        domain = []
+        
+        # Suffixes pour datetime
+        start_suffix = ' 00:00:00' if is_datetime else ''
+        end_suffix = ' 23:59:59' if is_datetime else ''
+        
+        # Détecter l'opérateur
+        match = re.match(r'^(>=?|<=?|=)?\s*(.+)$', filter_value.strip())
+        if not match:
+            return []
+        
+        operator = match.group(1) or '='
+        date_str = match.group(2).strip()
+        
+        try:
+            # Format année seule (AAAA)
+            if re.match(r'^\d{4}$', date_str):
+                year = int(date_str)
+                if operator == '=':
+                    domain.append((field_name, '>=', f'{year}-01-01{start_suffix}'))
+                    domain.append((field_name, '<=', f'{year}-12-31{end_suffix}'))
+                elif operator == '>':
+                    domain.append((field_name, '>', f'{year}-12-31{end_suffix}'))
+                elif operator == '>=':
+                    domain.append((field_name, '>=', f'{year}-01-01{start_suffix}'))
+                elif operator == '<':
+                    domain.append((field_name, '<', f'{year}-01-01{start_suffix}'))
+                elif operator == '<=':
+                    domain.append((field_name, '<=', f'{year}-12-31{end_suffix}'))
+            
+            # Format année-mois (AAAA-MM)
+            elif re.match(r'^\d{4}-\d{2}$', date_str):
+                year, month = map(int, date_str.split('-'))
+                start_date = datetime(year, month, 1)
+                if month == 12:
+                    end_date = datetime(year + 1, 1, 1) - timedelta(days=1)
+                else:
+                    end_date = datetime(year, month + 1, 1) - timedelta(days=1)
+                
+                if operator == '=':
+                    domain.append((field_name, '>=', start_date.strftime('%Y-%m-%d') + start_suffix))
+                    domain.append((field_name, '<=', end_date.strftime('%Y-%m-%d') + end_suffix))
+                elif operator == '>':
+                    domain.append((field_name, '>', end_date.strftime('%Y-%m-%d') + end_suffix))
+                elif operator == '>=':
+                    domain.append((field_name, '>=', start_date.strftime('%Y-%m-%d') + start_suffix))
+                elif operator == '<':
+                    domain.append((field_name, '<', start_date.strftime('%Y-%m-%d') + start_suffix))
+                elif operator == '<=':
+                    domain.append((field_name, '<=', end_date.strftime('%Y-%m-%d') + end_suffix))
+            
+            # Format année-semaine (AAAA-SXX)
+            elif re.match(r'^\d{4}-S\d{2}$', date_str.upper()):
+                year_week = date_str.upper().split('-S')
+                year = int(year_week[0])
+                week = int(year_week[1])
+                jan1 = datetime(year, 1, 1)
+                start_date = jan1 + timedelta(weeks=week-1, days=-jan1.weekday())
+                end_date = start_date + timedelta(days=6)
+                
+                if operator == '=':
+                    domain.append((field_name, '>=', start_date.strftime('%Y-%m-%d') + start_suffix))
+                    domain.append((field_name, '<=', end_date.strftime('%Y-%m-%d') + end_suffix))
+                elif operator == '>':
+                    domain.append((field_name, '>', end_date.strftime('%Y-%m-%d') + end_suffix))
+                elif operator == '>=':
+                    domain.append((field_name, '>=', start_date.strftime('%Y-%m-%d') + start_suffix))
+                elif operator == '<':
+                    domain.append((field_name, '<', start_date.strftime('%Y-%m-%d') + start_suffix))
+                elif operator == '<=':
+                    domain.append((field_name, '<=', end_date.strftime('%Y-%m-%d') + end_suffix))
+            
+            # Format date complète JJ/MM/AAAA
+            elif re.match(r'^\d{2}/\d{2}/\d{4}$', date_str):
+                day, month, year = map(int, date_str.split('/'))
+                date_value = f'{year:04d}-{month:02d}-{day:02d}'
+                if operator == '=' and is_datetime:
+                    domain.append((field_name, '>=', date_value + start_suffix))
+                    domain.append((field_name, '<=', date_value + end_suffix))
+                else:
+                    suffix = end_suffix if operator in ['<=', '>'] else start_suffix
+                    domain.append((field_name, operator, date_value + suffix))
+            
+            # Format date complète AAAA-MM-JJ
+            elif re.match(r'^\d{4}-\d{2}-\d{2}$', date_str):
+                if operator == '=' and is_datetime:
+                    domain.append((field_name, '>=', date_str + start_suffix))
+                    domain.append((field_name, '<=', date_str + end_suffix))
+                else:
+                    suffix = end_suffix if operator in ['<=', '>'] else start_suffix
+                    domain.append((field_name, operator, date_str + suffix))
+                
+        except Exception:
+            pass
+        
+        return domain
+
+    @http.route('/tableau_de_bord/save_filter', type='json', auth='user')
+    def save_filter(self, dashboard_id=None, filters_dict=None):
+        """Sauvegarde les filtres pour l'utilisateur courant"""
+        if dashboard_id and filters_dict:
+            request.env['is.tableau.de.bord.mem.filter'].save_filters(dashboard_id, filters_dict)
+        return {'success': True}
+
+    @http.route('/tableau_de_bord/get_saved_filter/<int:dashboard_id>', type='json', auth='user')
+    def get_saved_filter(self, dashboard_id):
+        """Récupère les derniers filtres saisis pour l'utilisateur courant"""
+        filters_dict = request.env['is.tableau.de.bord.mem.filter'].get_filters(dashboard_id)
+        return {'filters': filters_dict}
+
     @http.route('/tableau_de_bord/get_filter_data/<int:filter_id>', type='json', auth='user')
     def get_filter_data(self, filter_id, line_id=None, **kwargs):
         """Récupère les données d'un filtre pour l'afficher dans le tableau de bord"""
@@ -35,6 +303,14 @@ class TableauDeBordController(http.Controller):
             if not line_id:
                 line_id = kwargs.get('line_id')
             overrides = kwargs.get('overrides') or {}
+            dashboard_id = kwargs.get('dashboard_id')
+            filters_values = kwargs.get('filters_values') or {}
+            
+            print('=== get_filter_data ===')
+            print('filter_id:', filter_id)
+            print('line_id:', line_id)
+            print('dashboard_id:', dashboard_id)
+            print('filters_values:', filters_values)
             
             filter_obj = request.env['ir.filters'].browse(filter_id)
             if not filter_obj.exists():
@@ -49,6 +325,41 @@ class TableauDeBordController(http.Controller):
                     domain = ast.literal_eval(filter_obj.domain)
                 except Exception:
                     domain = []
+
+            # Appliquer les filtres dynamiques si définis
+            print('Checking filters_values:', filters_values, 'line_id:', line_id)
+            if filters_values and line_id:
+                try:
+                    line = request.env['is.tableau.de.bord.line'].browse(int(line_id))
+                    print('Line found:', line.exists(), 'line_filter_ids:', line.line_filter_ids if line.exists() else 'N/A')
+                    if line and line.exists() and line.line_filter_ids:
+                        for line_filter in line.line_filter_ids:
+                            filter_def_id = line_filter.filter_def_id.id
+                            print('Checking line_filter:', line_filter, 'filter_def_id:', filter_def_id)
+                            # Convertir les clés du dictionnaire en int pour la comparaison
+                            filter_value = None
+                            for key, val in filters_values.items():
+                                print('  Comparing key:', key, '(', type(key), ') with filter_def_id:', filter_def_id)
+                                if int(key) == filter_def_id:
+                                    filter_value = val
+                                    break
+                            
+                            print('filter_value for', filter_def_id, ':', filter_value)
+                            if filter_value:
+                                field_name = line_filter.field_id.name
+                                field_type = line_filter.field_id.ttype
+                                filter_type = line_filter.filter_def_id.filter_type
+                                print('Applying filter on field:', field_name, 'type:', field_type, 'filter_type:', filter_type)
+                                
+                                # Utiliser le parser avancé
+                                parsed_domain = self._parse_filter_value(field_name, field_type, filter_value, filter_type)
+                                print('Parsed domain:', parsed_domain)
+                                if parsed_domain:
+                                    domain.extend(parsed_domain)
+                                    print('Domain after extension:', domain)
+                except Exception:
+                    import traceback
+                    traceback.print_exc()
 
             # Récupérer le contexte du filtre
             context = {}
