@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
 
 {
-  "name" : "InfoSaône - Tableau de bord pour Odoo 18",
-  "version" : "0.3.0",
-  "author" : "InfoSaône / Tony Galmiche",
-  "category" : "InfoSaône",
+  "name"      : "InfoSaône - Tableau de bord pour Odoo 18",
+  "version"   : "18.0.1.0.0",
+  "author"    : "InfoSaône / Tony Galmiche",
+  "maintainer": "InfoSaône",
+  "website"   : "http://www.infosaone.com",
+  "category"  : "InfoSaône",
   "description": """
 InfoSaône - Tableau de bord pour Odoo 18
 
@@ -17,8 +19,6 @@ Fonctionnalités :
 - Configuration de la taille et position des éléments
 - Affichage en temps réel des données
 """,
-  "maintainer": "InfoSaône",
-  "website": "http://www.infosaone.com",
   "depends" : [
     'base',
     'web',
