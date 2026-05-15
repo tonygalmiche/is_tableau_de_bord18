@@ -1150,66 +1150,101 @@ class TableauDeBordController(http.Controller):
         except Exception:
             results = []
 
-        # Construire les labels et valeurs
-        data_list = []
-        if results:
+        # ── Mode multi-datasets (2 groupements → barres empilées) ──────────────
+        if len(groupbys) >= 2 and results:
+            gb0, gb1 = groupbys[0], groupbys[1]
+            # Conserver l'ordre d'apparition des labels
+            x_order = {}       # x_label -> total (pour tri par valeur)
+            series_order = {}  # series_label -> True
+            matrix = {}        # x_label -> {series_label: value}
+
             for r in results:
-                label_parts = []
-                for gb in groupbys:
-                    base = gb.split(':')[0]
-                    val = r.get(gb) or r.get(base) or r.get(f"{gb}_name") or r.get(f"{base}_name")
-                    # Pour les many2one (tuple/list), prendre le display_name (2ème élément)
-                    if isinstance(val, (list, tuple)) and len(val) > 1:
-                        label_parts.append(str(val[1]) if val[1] is not None else '')
-                    elif val is not None:
-                        label_parts.append(str(val))
-                    else:
-                        label_parts.append('')
-                label = " / ".join([p for p in label_parts if p])
-                
+                x_label = self._extract_label_from_record(r, gb0)
+                s_label = self._extract_label_from_record(r, gb1)
                 if use_count:
                     value = r.get("__count") or 0
                 else:
                     value = r.get(f"{measure}_{aggregator}") or r.get(measure) or 0
-                
+
+                if x_label not in matrix:
+                    matrix[x_label] = {}
+                    x_order[x_label] = 0
+                matrix[x_label][s_label] = value
+                x_order[x_label] += value
+                series_order[s_label] = True
+
+            # Trier les labels de l'axe X
+            x_items = list(x_order.items())
+            reverse = (sort_order == 'desc')
+            if sort_by == 'total':
+                x_items.sort(key=lambda x: x[1], reverse=reverse)
+            else:
+                x_items.sort(key=lambda x: self._sort_key_smart(x[0]), reverse=reverse)
+            if limit and limit > 0:
+                x_items = x_items[:limit]
+            x_labels = [item[0] for item in x_items]
+
+            # Construire un dataset par série (2ème groupement) — les couleurs sont appliquées côté JS
+            datasets = []
+            for s_label in series_order.keys():
+                datasets.append({
+                    'label': s_label,
+                    'data': [matrix.get(x, {}).get(s_label, 0) for x in x_labels],
+                })
+
+            return {
+                'type': 'graph',
+                'chart_type': chart_type,
+                'stacked': True,
+                'show_legend': show_legend,
+                'show_data_title': show_data_title,
+                'measure_label': agg_label,
+                'data': {
+                    'labels': x_labels,
+                    'datasets': datasets,
+                }
+            }
+
+        # ── Mode simple (1 groupement) ──────────────────────────────────────────
+        data_list = []
+        if results:
+            for r in results:
+                base = groupbys[0].split(':')[0] if groupbys else ''
+                label = self._extract_label_from_record(r, groupbys[0]) if groupbys else 'Total'
+                if use_count:
+                    value = r.get("__count") or 0
+                else:
+                    value = r.get(f"{measure}_{aggregator}") or r.get(measure) or 0
                 data_list.append({'label': label, 'value': value})
         else:
             total_count = model.search_count(domain)
             data_list = [{'label': 'Total', 'value': total_count}]
 
         # Appliquer le tri et la limite
+        reverse = (sort_order == 'desc')
         if sort_by == 'total':
-            # Tri par valeur
-            reverse = (sort_order == 'desc')
             data_list.sort(key=lambda x: x['value'], reverse=reverse)
         else:
-            # Tri par libellé (smart key)
-            reverse = (sort_order == 'desc')
             data_list.sort(key=lambda x: self._sort_key_smart(x['label']), reverse=reverse)
-        
-        # Appliquer la limite après le tri
         if limit and limit > 0:
             data_list = data_list[:limit]
-        
-        # Extraire les labels et valeurs triés/limités
+
         labels = [item['label'] for item in data_list]
         values = [item['value'] for item in data_list]
 
-        # Ajuster la palette à la longueur
-        palette = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
-        bg = [palette[i % len(palette)] for i in range(len(values))]
-
+        # Les couleurs sont appliquées côté JS via getColor de @web/core/colors/colors
         result = {
             'type': 'graph',
             'chart_type': chart_type,
+            'stacked': False,
             'show_legend': show_legend,
             'show_data_title': show_data_title,
+            'measure_label': agg_label,
             'data': {
                 'labels': labels,
                 'datasets': [{
                     'label': agg_label,
                     'data': values,
-                    'backgroundColor': bg
                 }]
             }
         }

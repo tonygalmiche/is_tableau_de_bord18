@@ -5,6 +5,7 @@ import { registry } from "@web/core/registry";
 import { FormController } from "@web/views/form/form_controller";
 import { rpc } from "@web/core/network/rpc";
 import { useService } from "@web/core/utils/hooks";
+import { getColor } from "@web/core/colors/colors";
 
 export class DashboardFormController extends FormController {
     setup() {
@@ -736,7 +737,8 @@ export class DashboardFormController extends FormController {
         const isPieChart = (data.chart_type || 'bar') === 'pie';
         const paddingClass = isPieChart ? 'p-1' : 'p-2';
         const titleMargin = isPieChart ? 'mb-0' : 'mb-1';
-        const graphTitle = data.data?.datasets?.[0]?.label || 'Graphique';
+        // Pour le titre : utiliser measure_label (mode stacked) ou label du 1er dataset
+        const graphTitle = data.measure_label || data.data?.datasets?.[0]?.label || 'Graphique';
         const showDataTitle = data.show_data_title !== undefined ? data.show_data_title : true;
         
         let titleHtml = '';
@@ -755,9 +757,9 @@ export class DashboardFormController extends FormController {
         container.innerHTML = html;
         container.className = "dashboard-item h-100";
 
-    const dataset = data.data?.datasets?.[0];
+        const datasets = data.data?.datasets || [];
         const labels = data.data?.labels || [];
-        if (!dataset) {
+        if (!datasets.length) {
             container.innerHTML = '<div class="alert alert-info m-2">Aucune donnée graphique disponible</div>';
             return;
         }
@@ -768,6 +770,7 @@ export class DashboardFormController extends FormController {
             const showLegend = data.show_legend !== undefined ? data.show_legend : true;
             const chartType = data.chart_type || 'bar';
             const isPieChart = chartType === 'pie';
+            const isStacked = data.stacked === true;
             
             // Options spécifiques selon le type de graphique
             const chartOptions = {
@@ -794,34 +797,36 @@ export class DashboardFormController extends FormController {
             // Ajouter les scales uniquement pour les graphiques bar et line
             if (!isPieChart) {
                 chartOptions.scales = {
-                    y: { beginAtZero: true }
+                    x: { stacked: isStacked },
+                    y: { beginAtZero: true, stacked: isStacked }
                 };
             }
+
+            // Construire les datasets Chart.js avec les couleurs Odoo
+            const chartDatasets = datasets.map((ds, index) => ({
+                label: ds.label,
+                data: ds.data,
+                backgroundColor: ds.data.length === 1 || data.stacked
+                    ? getColor(index, undefined, datasets.length)
+                    : ds.data.map((_, i) => getColor(i, undefined, ds.data.length)),
+                borderWidth: 1,
+            }));
             
             new window.Chart(el.getContext('2d'), {
                 type: chartType,
-                data: {
-                    labels,
-                    datasets: [{
-                        label: dataset.label,
-                        data: dataset.data,
-                        backgroundColor: dataset.backgroundColor || '#1f77b4',
-                        borderWidth: 1,
-                    }]
-                },
+                data: { labels, datasets: chartDatasets },
                 options: chartOptions
             });
         } else {
-            // Fallback: valeurs en gros comme avant
+            // Fallback: valeurs en gros (premier dataset uniquement)
+            const dataset = datasets[0];
             let fallback = '<div class="text-center p-4 h-100 d-flex flex-column justify-content-center">';
             fallback += `<h5 class="mb-3">${dataset.label}</h5>`;
             fallback += '<div class="row flex-grow-1 align-items-center">';
             for (let i = 0; i < labels.length; i++) {
-                const value = dataset.data[i];
-                const label = labels[i];
                 fallback += `<div class="col text-center">
-                    <div class="display-4 text-primary mb-2">${value}</div>
-                    <div class="small text-muted">${label}</div>
+                    <div class="display-4 text-primary mb-2">${dataset.data[i]}</div>
+                    <div class="small text-muted">${labels[i]}</div>
                 </div>`;
             }
             fallback += '</div></div>';
