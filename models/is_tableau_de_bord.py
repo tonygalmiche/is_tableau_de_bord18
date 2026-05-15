@@ -644,7 +644,7 @@ class IsTableauDeBordLine(models.Model):
             try:
                 import ast
                 domain = ast.literal_eval(self.filter_id.domain) if isinstance(self.filter_id.domain, str) else self.filter_id.domain
-            except:
+            except Exception:
                 domain = []
         
         # Déterminer les vues et le mode en fonction de display_mode

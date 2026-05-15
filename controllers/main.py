@@ -291,6 +291,101 @@ class TableauDeBordController(http.Controller):
             request.env['is.tableau.de.bord.mem.filter'].save_filters(dashboard_id, filters_dict)
         return {'success': True}
 
+    @http.route('/tableau_de_bord/open_filter_fullscreen', type='json', auth='user')
+    def open_filter_fullscreen(self, line_id, filters_values=None):
+        """Construit et retourne l'action Odoo pour ouvrir une ligne en plein écran.
+        Applique les filtres dynamiques de l'entête du tableau de bord si fournis.
+        """
+        line = request.env['is.tableau.de.bord.line'].browse(int(line_id))
+        if not line.exists() or not line.filter_id:
+            return {}
+
+        filter_obj = line.filter_id
+
+        # Préparer le contexte depuis le filtre enregistré
+        context = {}
+        if filter_obj.context:
+            try:
+                context_str = filter_obj.context.replace('null', 'None').replace('true', 'True').replace('false', 'False')
+                context = ast.literal_eval(context_str)
+            except Exception:
+                context = {}
+
+        # Surcharger avec les paramètres de la ligne
+        if line.graph_measure:
+            context['graph_measure'] = line.graph_measure
+        if line.graph_groupbys:
+            context['graph_groupbys'] = [g.strip() for g in line.graph_groupbys.split(',')]
+        if line.graph_chart_type:
+            context['graph_mode'] = line.graph_chart_type
+        if line.graph_aggregator:
+            context['graph_aggregator'] = line.graph_aggregator
+        if line.pivot_measure:
+            context['pivot_measures'] = [line.pivot_measure]
+        if line.pivot_row_groupby:
+            context['pivot_row_groupby'] = [g.strip() for g in line.pivot_row_groupby.split(',')]
+        if line.pivot_col_groupby:
+            context['pivot_column_groupby'] = [g.strip() for g in line.pivot_col_groupby.split(',')]
+
+        # Construire le domaine de base
+        domain = []
+        if filter_obj.domain:
+            try:
+                eval_context = {
+                    'datetime': safe_datetime,
+                    'context_today': lambda: date.today(),
+                    'current_date': date.today().strftime('%Y-%m-%d'),
+                    'time': safe_time,
+                    'relativedelta': relativedelta,
+                    'timedelta': timedelta,
+                    'uid': request.env.uid,
+                    'user': request.env.user,
+                }
+                domain = safe_eval(filter_obj.domain, eval_context)
+            except Exception:
+                domain = []
+
+        # Appliquer les filtres dynamiques de l'entête du tableau de bord
+        if filters_values and line.line_filter_ids:
+            for line_filter in line.line_filter_ids:
+                filter_def_id = line_filter.filter_def_id.id
+                filter_value = next(
+                    (val for key, val in filters_values.items() if int(key) == filter_def_id),
+                    None
+                )
+                if filter_value:
+                    field_name = line_filter.field_id.name
+                    field_type = line_filter.field_id.ttype
+                    filter_type = line_filter.filter_def_id.filter_type
+                    parsed = self._parse_filter_value(field_name, field_type, filter_value, filter_type)
+                    if parsed:
+                        domain.extend(parsed)
+
+        # Déterminer les vues selon display_mode
+        if line.display_mode == 'list':
+            views = [[False, 'list'], [False, 'form']]
+            view_mode = 'list,form'
+        elif line.display_mode == 'graph':
+            views = [[False, 'graph'], [False, 'list'], [False, 'form']]
+            view_mode = 'graph,list,form'
+        elif line.display_mode == 'pivot':
+            views = [[False, 'pivot'], [False, 'list'], [False, 'form']]
+            view_mode = 'pivot,list,form'
+        else:
+            views = [[False, 'list'], [False, 'graph'], [False, 'pivot'], [False, 'form']]
+            view_mode = 'list,graph,pivot,form'
+
+        return {
+            'type': 'ir.actions.act_window',
+            'name': filter_obj.name,
+            'res_model': filter_obj.model_id,
+            'views': views,
+            'view_mode': view_mode,
+            'domain': domain,
+            'context': context,
+            'target': 'current',
+        }
+
     @http.route('/tableau_de_bord/get_saved_filter/<int:dashboard_id>', type='json', auth='user')
     def get_saved_filter(self, dashboard_id):
         """Récupère les derniers filtres saisis pour l'utilisateur courant"""

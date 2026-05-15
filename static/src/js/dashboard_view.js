@@ -464,18 +464,25 @@ export class DashboardFormController extends FormController {
 
     async openFilterFullScreen(lineId) {
         try {
-            // Appeler la méthode Python action_open_filter sur le modèle is.tableau.de.bord.line
-            const result = await rpc("/web/dataset/call_kw/is.tableau.de.bord.line/action_open_filter", {
-                model: 'is.tableau.de.bord.line',
-                method: 'action_open_filter',
-                args: [[lineId]],
-                kwargs: {}
+            // Collecter les valeurs actuelles des filtres de l'entête du tableau de bord
+            const filtersValues = {};
+            document.querySelectorAll('.dashboard-filter-input').forEach(input => {
+                const filterId = input.dataset.filterId;
+                const value = input.value ? input.value.trim() : '';
+                if (filterId && value) {
+                    filtersValues[filterId] = value;
+                }
+            });
+
+            // Appeler le route contrôleur qui gère déjà le parsing des filtres
+            const result = await rpc("/tableau_de_bord/open_filter_fullscreen", {
+                line_id: lineId,
+                filters_values: filtersValues,
             });
             
             if (result && result.type) {
-                // Exécuter l'action retournée par Python
                 await this.actionService.doAction(result);
-            } 
+            }
             
         } catch (error) {
             console.error("[TDB] Erreur lors de l'ouverture du filtre:", error);
