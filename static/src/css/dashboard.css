@@ -42,6 +42,25 @@
     min-height: 200px;
 }
 
+/* Vue Kanban réelle montée dans une tuile : en dehors de .o_action_manager,
+   .o_content n'a pas la règle "height:100%; overflow:auto" du webclient standard.
+   Sans ça, le contenu grandit à sa hauteur naturelle et l'ascenseur horizontal
+   des colonnes groupées se retrouve tout en bas du contenu au lieu de rester
+   visible dans la zone de la tuile. On recale donc cette règle ici. */
+.o_kanban_dashboard_tile {
+    height: 100%;
+    overflow: hidden;
+}
+
+.o_kanban_dashboard_tile > div {
+    height: 100%;
+}
+
+.o_kanban_dashboard_tile .o_content {
+    height: 100%;
+    overflow: auto;
+}
+
 /* Classe pour 5 colonnes (20% chacune) */
 .col-md-20 {
     flex: 0 0 20%;

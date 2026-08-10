@@ -371,6 +371,9 @@ class TableauDeBordController(http.Controller):
         elif line.display_mode == 'pivot':
             views = [[False, 'pivot'], [False, 'list'], [False, 'form']]
             view_mode = 'pivot,list,form'
+        elif line.display_mode == 'kanban':
+            views = [[False, 'kanban'], [False, 'list'], [False, 'form']]
+            view_mode = 'kanban,list,form'
         else:
             views = [[False, 'list'], [False, 'graph'], [False, 'pivot'], [False, 'form']]
             view_mode = 'list,graph,pivot,form'
@@ -545,6 +548,8 @@ class TableauDeBordController(http.Controller):
                 return self._get_graph_data(model, filter_obj, domain, ctx, line)
             elif view_type == 'pivot':
                 return self._get_pivot_data(model, filter_obj, domain, ctx, line)
+            elif view_type == 'kanban':
+                return self._get_kanban_data(model, filter_obj, domain, ctx, line)
             else:
                 return self._get_list_data(model, filter_obj, domain, ctx, line)
 
@@ -560,17 +565,46 @@ class TableauDeBordController(http.Controller):
                 return 'graph'
             if 'pivot' in view_type:
                 return 'pivot'
+            if 'kanban' in view_type:
+                return 'kanban'
             if 'list' in view_type:
                 return 'list'
-        
+
         # Priorité 2: paramètres spécifiques au type de vue
         if context.get('graph_measure') or context.get('graph_groupbys'):
             return 'graph'
         if context.get('pivot_measures') or context.get('pivot_row_groupby') or context.get('pivot_column_groupby'):
             return 'pivot'
-        
+
         # Par défaut: liste
         return 'list'
+
+    def _get_kanban_data(self, model, filter_obj, domain, context, line=None):
+        """Prépare les données nécessaires pour monter la vraie vue Kanban Odoo
+        du modèle cible côté client (mêmes cartes/templates que la vue kanban standard).
+        """
+        # Le contexte peut contenir des clés techniques propres au tableau de bord
+        # (line_id, search_default_view_type, ...) inutiles/gênantes pour la vue Kanban réelle
+        kanban_context = {
+            k: v for k, v in context.items()
+            if k not in ('line_id', 'search_default_view_type')
+        }
+
+        # Si demandé sur la ligne, forcer l'affichage à plat (sans colonnes de regroupement),
+        # même si le filtre enregistré contient un group_by ou si la vue kanban du modèle
+        # cible définit elle-même un default_group_by dans son arch (ex: pipeline CRM)
+        ungroup = bool(line and getattr(line, 'kanban_ungroup', False))
+        if ungroup:
+            kanban_context.pop('group_by', None)
+            kanban_context.pop('groupby', None)
+
+        return {
+            'type': 'kanban',
+            'model': filter_obj.model_id,
+            'domain': clean_for_json(domain),
+            'context': clean_for_json(kanban_context),
+            'ungroup': ungroup,
+        }
 
     def _get_list_data(self, model, filter_obj, domain, context, line=None):
         """Génère les données pour une vue liste

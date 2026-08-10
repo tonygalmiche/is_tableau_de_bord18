@@ -162,7 +162,15 @@ class IsTableauDeBordLine(models.Model):
         ('list', 'Liste'),
         ('graph', 'Graphique'),
         ('pivot', 'Tableau croisé'),
+        ('kanban', 'Kanban'),
     ], string='Mode d\'affichage', default='graph')
+
+    kanban_ungroup = fields.Boolean(
+        'Kanban sans regroupement',
+        default=False,
+        help="Si coché, la vue Kanban s'affiche à plat (sans colonnes), même si le filtre "
+             "enregistré contient un regroupement.",
+    )
 
     graph_chart_type = fields.Selection([
         ('bar', 'Barres'),
@@ -276,10 +284,11 @@ class IsTableauDeBordLine(models.Model):
             self.user_id = self.filter_id.user_id
         
         # Récupérer le display_mode depuis le filtre si renseigné
-        if self.filter_id.is_view_type:
-            view_type = self.filter_id.is_view_type
-            if view_type:
-                self.display_mode = view_type
+        # (uniquement si compatible avec les modes gérés par le tableau de bord :
+        # is_view_type propose aussi form/calendar/activity/gantt/map qui n'existent pas sur display_mode)
+        allowed_display_modes = dict(self._fields['display_mode'].selection)
+        if self.filter_id.is_view_type in allowed_display_modes:
+            self.display_mode = self.filter_id.is_view_type
         
         # Extraire les informations du contexte
         if self.filter_id.context:
@@ -480,9 +489,11 @@ class IsTableauDeBordLine(models.Model):
                 return {}
             
             result = {}
-            
+
             # Récupérer le display_mode depuis le filtre
-            if filter_obj.is_view_type:
+            # (uniquement si compatible avec les modes gérés par le tableau de bord)
+            allowed_display_modes = dict(self._fields['display_mode'].selection)
+            if filter_obj.is_view_type in allowed_display_modes:
                 result['display_mode'] = filter_obj.is_view_type
             
             # Pour les pivots
@@ -657,6 +668,9 @@ class IsTableauDeBordLine(models.Model):
         elif self.display_mode == 'pivot':
             views = [[False, 'pivot'], [False, 'list'], [False, 'form']]
             view_mode = 'pivot,list,form'
+        elif self.display_mode == 'kanban':
+            views = [[False, 'kanban'], [False, 'list'], [False, 'form']]
+            view_mode = 'kanban,list,form'
         else:  # auto ou non défini
             # Utiliser toutes les vues disponibles
             views = [[False, 'list'], [False, 'graph'], [False, 'pivot'], [False, 'form']]

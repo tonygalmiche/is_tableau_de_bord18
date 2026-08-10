@@ -47,6 +47,12 @@ Le module **is_tableau_de_bord18** est un module développé par InfoSaône perm
   - Analyse 2D (lignes × colonnes)
 - **Agrégations** : somme, compte, moyenne, etc.
 
+#### 🗂️ Mode Kanban
+- **Rendu natif Odoo** : la tuile monte la vraie vue Kanban du modèle cible (même composant que celui utilisé nativement dans l'application), avec un rendu strictement identique à la vue kanban standard (cartes, couleurs, images, widgets, tags...)
+- **Ouverture de fiche** : cliquer sur une carte ouvre directement l'enregistrement, comme dans une vue kanban normale
+- **Regroupement automatique** : si le favori (ou la vue du modèle) définit un groupement (ex : pipeline CRM par étape), les colonnes s'affichent automatiquement
+- **Option "Kanban sans regroupement"** : force un affichage à plat (sans colonnes), même si le filtre enregistré ou la vue kanban du modèle définit un regroupement par défaut
+
 ### 4. Personnalisation de l'affichage
 
 #### Dimensions
@@ -118,9 +124,10 @@ Modèle principal représentant un tableau de bord
 - `user_id` : Utilisateur propriétaire du filtre
 - `filter_id` : Recherche enregistrée (favori)
 - `width` / `height` : Dimensions de l'élément
-- `display_mode` : Mode d'affichage (list/graph/pivot)
+- `display_mode` : Mode d'affichage (list/graph/pivot/kanban)
 - `graph_*` : Configuration spécifique aux graphiques
 - `pivot_*` : Configuration spécifique aux tableaux croisés
+- `kanban_ungroup` : Force l'affichage à plat (sans colonnes) en mode Kanban
 - `field_ids` : Configuration des champs pour le mode liste
 
 #### is.tableau.de.bord.line.field
@@ -145,6 +152,7 @@ Configuration des champs en mode liste
 - Extension du `FormController` d'Odoo
 - Génération dynamique de l'interface
 - Intégration avec Chart.js pour les graphiques
+- Mode Kanban : montage du composant `View` natif d'Odoo (technique utilisée par le module `board`) au lieu d'un rendu HTML fait main, pour un rendu et un clic sur les cartes identiques à la vue kanban standard
 - Gestion des événements utilisateur
 - Appels RPC pour charger les données
 
@@ -183,7 +191,7 @@ Configuration des champs en mode liste
 2. **Sélectionnez un utilisateur** : Filtrez les recherches par utilisateur (optionnel)
 3. **Sélectionnez une recherche enregistrée** : Choisissez parmi vos favoris
 4. **Configurez l'affichage** :
-   - Choisissez le mode (Liste, Graphique, Pivot)
+   - Choisissez le mode (Liste, Graphique, Pivot, Kanban)
    - Définissez la largeur et la hauteur
    - Configurez les options spécifiques au mode choisi
 5. **Enregistrez**
@@ -200,6 +208,11 @@ Configuration des champs en mode liste
 2. Choisissez le type de graphique (Barres, Courbes, Camembert)
 3. Les paramètres sont récupérés automatiquement du favori
 4. Possibilité de surcharger manuellement si nécessaire
+
+#### Mode Kanban - Configuration
+1. Sélectionnez le mode d'affichage "Kanban" (automatique si le favori a été enregistré depuis une vue kanban)
+2. La tuile affiche la vraie vue kanban du modèle, avec son regroupement éventuel (ex : pipeline par étape)
+3. Cochez **"Kanban sans regroupement"** pour afficher les cartes à plat, sans colonnes
 
 ### Pour les utilisateurs
 
@@ -244,6 +257,9 @@ Les paramètres suivants peuvent être configurés :
 - `pivot_col_groupby` : Groupement en colonnes
 - `pivot_measure` : Champ numérique à mesurer
 
+### Personnalisation du Kanban
+- `kanban_ungroup` : si coché, retire le regroupement (colonnes) même si le filtre enregistré ou la vue kanban du modèle en définit un par défaut (ex : pipeline CRM groupé par étape)
+
 ### Filtres dynamiques
 Les domaines et contextes des recherches enregistrées sont respectés :
 - Filtres sur les dates relatives (mois en cours, année en cours, etc.)
@@ -268,6 +284,11 @@ Les domaines et contextes des recherches enregistrées sont respectés :
 - Consultez la console JavaScript du navigateur
 
 ## 📝 Notes de version
+
+### Version 0.4.0
+- Ajout du mode d'affichage **Kanban** : rendu de la vraie vue kanban du modèle cible (identique à la vue standard), clic sur une carte pour ouvrir la fiche
+- Option **"Kanban sans regroupement"** pour afficher les cartes à plat
+- Correction : un favori enregistré depuis une vue non supportée (form, calendar, activity, gantt, map) ne fait plus planter la ligne de tableau de bord
 
 ### Version 0.3.0
 - Support complet d'Odoo 18

@@ -1,23 +1,65 @@
 /** @odoo-module **/
 
-import { Component, onMounted, onWillStart } from "@odoo/owl";
+import { Component, onMounted, onWillStart, onWillUnmount, xml } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { FormController } from "@web/views/form/form_controller";
 import { rpc } from "@web/core/network/rpc";
 import { useService } from "@web/core/utils/hooks";
 import { getColor } from "@web/core/colors/colors";
+import { mountComponent } from "@web/env";
+import { View } from "@web/views/view";
+
+// Composant minimal qui monte la vraie vue Kanban Odoo du modèle cible :
+// rendu strictement identique à la vue kanban standard (mêmes templates/widgets),
+// et clic sur une carte ouvre la fiche via le callback openRecord.
+class DashboardKanbanView extends Component {
+    static template = xml`<View t-props="viewProps"/>`;
+    static components = { View };
+    static props = ["resModel", "domain", "context", "openRecord", "ungroup"];
+
+    get viewProps() {
+        const props = {
+            resModel: this.props.resModel,
+            type: "kanban",
+            domain: this.props.domain,
+            context: this.props.context,
+            display: { controlPanel: false },
+            allowSelectors: false,
+            selectRecord: this.props.openRecord,
+        };
+        if (this.props.ungroup) {
+            // Certaines vues kanban définissent un default_group_by dans leur arch
+            // (ex: pipeline CRM groupé par étape). Retirer "groupBy" des searchMenuTypes
+            // empêche ce fallback de s'appliquer, même sans group_by explicite.
+            props.searchMenuTypes = [];
+        }
+        return props;
+    }
+}
 
 export class DashboardFormController extends FormController {
     setup() {
         super.setup();
         this.actionService = useService("action");
-        
+        this.kanbanApps = {};
+
         onMounted(() => {
             // Vérifier si nous sommes en mode dashboard
             if (this.isDashboard()) {
                 this.setupDashboard();
             }
         });
+
+        onWillUnmount(() => {
+            this.destroyKanbanApps();
+        });
+    }
+
+    destroyKanbanApps() {
+        for (const app of Object.values(this.kanbanApps)) {
+            app.destroy();
+        }
+        this.kanbanApps = {};
     }
 
     isDashboard() {
@@ -330,6 +372,9 @@ export class DashboardFormController extends FormController {
             return;
         }
 
+        // Détruire les vues Kanban montées avant de reconstruire le DOM des tuiles
+        this.destroyKanbanApps();
+
         let html = '<div class="row">';
         
         for (const lineRecord of record.data.line_ids.records) {
@@ -600,6 +645,12 @@ export class DashboardFormController extends FormController {
             return;
         }
 
+        // Si la tuile n'est plus en Kanban (changement de mode), détruire la vue montée précédemment
+        if (data.type !== 'kanban' && this.kanbanApps[lineId]) {
+            this.kanbanApps[lineId].destroy();
+            delete this.kanbanApps[lineId];
+        }
+
         if (data.error) {
             this.renderError(lineId, data.error);
             return;
@@ -615,9 +666,48 @@ export class DashboardFormController extends FormController {
             case 'pivot':
                 this.renderPivotData(container, data);
                 break;
+            case 'kanban':
+                this.renderKanbanData(lineId, container, data);
+                break;
             default:
                 this.renderError(lineId, "Type de données non supporté: " + data.type);
         }
+    }
+
+    async renderKanbanData(lineId, container, data) {
+        if (this.kanbanApps[lineId]) {
+            this.kanbanApps[lineId].destroy();
+            delete this.kanbanApps[lineId];
+        }
+
+        container.innerHTML = '';
+        container.className = "dashboard-item h-100 o_kanban_dashboard_tile";
+
+        try {
+            const app = await mountComponent(DashboardKanbanView, container, {
+                env: this.env,
+                props: {
+                    resModel: data.model,
+                    domain: data.domain || [],
+                    context: data.context || {},
+                    ungroup: !!data.ungroup,
+                    openRecord: (resId) => this.openKanbanRecord(data.model, resId),
+                },
+            });
+            this.kanbanApps[lineId] = app;
+        } catch (error) {
+            this.renderError(lineId, "Erreur lors de l'affichage du Kanban: " + error.message);
+        }
+    }
+
+    openKanbanRecord(resModel, resId) {
+        this.actionService.doAction({
+            type: 'ir.actions.act_window',
+            res_model: resModel,
+            res_id: resId,
+            views: [[false, 'form']],
+            target: 'current',
+        });
     }
 
     renderListData(container, data) {
@@ -1091,7 +1181,25 @@ registry.category("views").add("form", {
                 return DashboardFormController.prototype.renderPivotData.call(this, container, data);
             }
         }
-        
+
+        async renderKanbanData(lineId, container, data) {
+            if (this.isDashboard()) {
+                return DashboardFormController.prototype.renderKanbanData.call(this, lineId, container, data);
+            }
+        }
+
+        openKanbanRecord(resModel, resId) {
+            if (this.isDashboard()) {
+                return DashboardFormController.prototype.openKanbanRecord.call(this, resModel, resId);
+            }
+        }
+
+        destroyKanbanApps() {
+            if (this.isDashboard()) {
+                return DashboardFormController.prototype.destroyKanbanApps.call(this);
+            }
+        }
+
         renderError(lineId, message) {
             if (this.isDashboard()) {
                 return DashboardFormController.prototype.renderError.call(this, lineId, message);

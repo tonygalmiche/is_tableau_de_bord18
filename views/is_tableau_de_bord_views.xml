@@ -51,6 +51,7 @@
                                     <field name="show_record_count" optional="hide"/>
                                     <field name="limit" optional="hide"/>
                                     <field name="list_groupby" optional="hide"/>
+                                    <field name="kanban_ungroup" optional="hide"/>
                                 </list>
                             </field>
                         </page>
@@ -149,6 +150,9 @@
                     <group invisible="display_mode != 'list'">
                         <field name="show_record_count"/>
                         <field name="list_groupby" help="Champs de regroupement séparés par des virgules (ex: secteur_id,partner_id). Si défini, affiche une ligne par regroupement avec les totaux des champs numériques."/>
+                    </group>
+                    <group invisible="display_mode != 'kanban'" string="Options du Kanban">
+                        <field name="kanban_ungroup" help="Si coché, la vue Kanban s'affiche à plat (sans colonnes), même si le filtre enregistré contient un regroupement."/>
                     </group>
                     <group invisible="display_mode != 'list'">
                         <field name="field_ids">
