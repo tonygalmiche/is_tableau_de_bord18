@@ -15,7 +15,7 @@ import { View } from "@web/views/view";
 class DashboardKanbanView extends Component {
     static template = xml`<View t-props="viewProps"/>`;
     static components = { View };
-    static props = ["resModel", "domain", "context", "openRecord", "ungroup"];
+    static props = ["resModel", "domain", "context", "openRecord", "ungroup", "limit"];
 
     get viewProps() {
         const props = {
@@ -24,9 +24,11 @@ class DashboardKanbanView extends Component {
             domain: this.props.domain,
             context: this.props.context,
             display: { controlPanel: false },
-            allowSelectors: false,
             selectRecord: this.props.openRecord,
         };
+        if (this.props.limit) {
+            props.limit = this.props.limit;
+        }
         if (this.props.ungroup) {
             // Certaines vues kanban définissent un default_group_by dans leur arch
             // (ex: pipeline CRM groupé par étape). Retirer "groupBy" des searchMenuTypes
@@ -691,6 +693,7 @@ export class DashboardFormController extends FormController {
                     domain: data.domain || [],
                     context: data.context || {},
                     ungroup: !!data.ungroup,
+                    limit: data.limit || null,
                     openRecord: (resId) => this.openKanbanRecord(data.model, resId),
                 },
             });

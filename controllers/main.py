@@ -598,12 +598,17 @@ class TableauDeBordController(http.Controller):
             kanban_context.pop('group_by', None)
             kanban_context.pop('groupby', None)
 
+        limit = None
+        if line and hasattr(line, 'limit') and line.limit > 0:
+            limit = line.limit
+
         return {
             'type': 'kanban',
             'model': filter_obj.model_id,
             'domain': clean_for_json(domain),
             'context': clean_for_json(kanban_context),
             'ungroup': ungroup,
+            'limit': limit,
         }
 
     def _get_list_data(self, model, filter_obj, domain, context, line=None):
