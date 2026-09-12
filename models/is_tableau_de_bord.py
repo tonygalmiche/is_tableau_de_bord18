@@ -7,15 +7,17 @@ from odoo import models, fields, api
 class IsTableauDeBord(models.Model):
     _name = 'is.tableau.de.bord'
     _description = 'Tableau de bord'
-    _order = 'name'
+    _order = 'sequence, name'
 
     name = fields.Char('Nom du tableau de bord', required=True)
+    sequence = fields.Integer('Séquence', default=10)
     description = fields.Text('Description')
     line_ids = fields.One2many('is.tableau.de.bord.line', 'tableau_id', copy=True, string='Lignes du tableau de bord')
     filter_def_ids = fields.One2many('is.tableau.de.bord.filter.def', 'tableau_id', copy=True, string='Définition des filtres')
     active = fields.Boolean('Actif', default=True)
     color = fields.Integer('Couleur', default=lambda self: random.randint(1, 11))
     image = fields.Binary('Image', attachment=True)
+    image_only = fields.Boolean('Afficher uniquement l\'image dans la vignette', default=False)
 
     def action_view_dashboard(self):
         """Action pour afficher le tableau de bord"""
