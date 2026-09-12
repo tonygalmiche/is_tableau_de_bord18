@@ -1,7 +1,11 @@
 # -*- coding: utf-8 -*-
 
 import random
+from datetime import date, timedelta
+from dateutil.relativedelta import relativedelta
 from odoo import models, fields, api
+from odoo.osv import expression
+from odoo.tools.safe_eval import safe_eval
 
 
 class IsTableauDeBord(models.Model):
@@ -651,14 +655,32 @@ class IsTableauDeBordLine(models.Model):
         if self.pivot_col_groupby:
             context['pivot_column_groupby'] = [g.strip() for g in self.pivot_col_groupby.split(',')]
         
-        # Préparer le domaine
+        # Préparer le domaine (filtre + domaine de l'action liée, non repris
+        # automatiquement dans le domaine du ir.filters)
+        eval_context = {
+            'context_today': lambda: date.today(),
+            'current_date': date.today().strftime('%Y-%m-%d'),
+            'relativedelta': relativedelta,
+            'timedelta': timedelta,
+            'uid': self.env.uid,
+            'user': self.env.user,
+        }
         domain = []
         if self.filter_id.domain:
             try:
-                import ast
-                domain = ast.literal_eval(self.filter_id.domain) if isinstance(self.filter_id.domain, str) else self.filter_id.domain
+                domain = safe_eval(self.filter_id.domain, eval_context)
             except Exception:
                 domain = []
+
+        if self.filter_id.action_id:
+            action = self.env['ir.actions.act_window'].sudo().browse(self.filter_id.action_id.id)
+            if action.exists() and action.domain:
+                try:
+                    action_domain = safe_eval(action.domain, eval_context)
+                    if action_domain:
+                        domain = expression.AND([action_domain, domain])
+                except Exception:
+                    pass
         
         # Déterminer les vues et le mode en fonction de display_mode
         if self.display_mode == 'list':

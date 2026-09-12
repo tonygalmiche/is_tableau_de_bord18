@@ -9,6 +9,7 @@ from dateutil.relativedelta import relativedelta
 from odoo import http
 from odoo.http import request
 from odoo.tools.safe_eval import safe_eval, datetime as safe_datetime, time as safe_time
+from odoo.osv import expression
 from lxml import etree
 
 
@@ -30,6 +31,45 @@ def clean_for_json(obj):
 
 
 class TableauDeBordController(http.Controller):
+
+    def _get_filter_eval_context(self):
+        """Contexte d'évaluation pour les domaines dynamiques (context_today(), relativedelta, ...)"""
+        return {
+            'datetime': safe_datetime,
+            'context_today': lambda: date.today(),
+            'current_date': date.today().strftime('%Y-%m-%d'),
+            'time': safe_time,
+            'relativedelta': relativedelta,
+            'timedelta': timedelta,
+            'uid': request.env.uid,
+            'user': request.env.user,
+        }
+
+    def _get_filter_domain(self, filter_obj):
+        """Calcule le domaine effectif d'un ir.filters en tenant compte à la fois de son
+        propre domaine ET du domaine de l'action fenêtre à laquelle il est rattaché
+        (ir.filters.action_id), car ce dernier n'est pas repris automatiquement dans
+        le domaine du filtre enregistré."""
+        eval_context = self._get_filter_eval_context()
+        domain = []
+        if filter_obj.domain:
+            try:
+                domain = safe_eval(filter_obj.domain, eval_context)
+            except Exception:
+                domain = []
+
+        action_domain = []
+        if filter_obj.action_id:
+            action = request.env['ir.actions.act_window'].sudo().browse(filter_obj.action_id.id)
+            if action.exists() and action.domain:
+                try:
+                    action_domain = safe_eval(action.domain, eval_context)
+                except Exception:
+                    action_domain = []
+
+        if action_domain:
+            domain = expression.AND([action_domain, domain])
+        return domain
 
     def _parse_filter_value(self, field_name, field_type, filter_value, filter_type='text'):
         """Parse une valeur de filtre avec support des opérateurs avancés
@@ -327,23 +367,8 @@ class TableauDeBordController(http.Controller):
         if line.pivot_col_groupby:
             context['pivot_column_groupby'] = [g.strip() for g in line.pivot_col_groupby.split(',')]
 
-        # Construire le domaine de base
-        domain = []
-        if filter_obj.domain:
-            try:
-                eval_context = {
-                    'datetime': safe_datetime,
-                    'context_today': lambda: date.today(),
-                    'current_date': date.today().strftime('%Y-%m-%d'),
-                    'time': safe_time,
-                    'relativedelta': relativedelta,
-                    'timedelta': timedelta,
-                    'uid': request.env.uid,
-                    'user': request.env.user,
-                }
-                domain = safe_eval(filter_obj.domain, eval_context)
-            except Exception:
-                domain = []
+        # Construire le domaine de base (filtre + domaine de l'action liée)
+        domain = self._get_filter_domain(filter_obj)
 
         # Appliquer les filtres dynamiques de l'entête du tableau de bord
         if filters_values and line.line_filter_ids:
@@ -412,25 +437,9 @@ class TableauDeBordController(http.Controller):
 
             model = request.env[filter_obj.model_id]
 
-            # Récupérer le domaine du filtre
-            domain = []
-            if filter_obj.domain:
-                try:
-                    # Utiliser safe_eval pour supporter les expressions dynamiques
-                    # comme context_today(), datetime.timedelta, relativedelta, etc.
-                    eval_context = {
-                        'datetime': safe_datetime,
-                        'context_today': lambda: date.today(),
-                        'current_date': date.today().strftime('%Y-%m-%d'),
-                        'time': safe_time,
-                        'relativedelta': relativedelta,
-                        'timedelta': timedelta,
-                        'uid': request.env.uid,
-                        'user': request.env.user,
-                    }
-                    domain = safe_eval(filter_obj.domain, eval_context)
-                except Exception:
-                    domain = []
+            # Récupérer le domaine du filtre (+ domaine de l'action liée, non repris
+            # automatiquement dans le domaine du ir.filters)
+            domain = self._get_filter_domain(filter_obj)
 
             # Appliquer les filtres dynamiques si définis
             if filters_values and line_id:
