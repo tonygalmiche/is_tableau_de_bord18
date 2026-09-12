@@ -2,7 +2,7 @@
 
 {
   "name"      : "InfoSaône - Tableau de bord pour Odoo 18",
-  "version"   : "18.0.1.0.0",
+  "version"   : "18.0.1.1.0",
   "author"    : "InfoSaône / Tony Galmiche",
   "maintainer": "InfoSaône",
   "website"   : "http://www.infosaone.com",
