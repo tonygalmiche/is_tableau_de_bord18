@@ -285,16 +285,16 @@ Les domaines et contextes des recherches enregistrées sont respectés :
 
 ## 📝 Notes de version
 
-### Version 0.5.0
+### Version 0.5
 - Vignette kanban **"Image seule"** : nouvelle case à cocher `image_only` sur le tableau de bord pour afficher uniquement l'image en plein format (sans titre ni cadre), avec une info bulle (titre + description) qui apparaît au survol
 - Correction : le domaine de l'action fenêtre liée à une recherche enregistrée (`ir.filters.action_id`) est désormais pris en compte en plus du domaine du filtre lui-même, pour les vignettes et l'ouverture en plein écran (évite par exemple l'affichage d'événements passés absents du menu d'origine)
 
-### Version 0.4.0
+### Version 0.4
 - Ajout du mode d'affichage **Kanban** : rendu de la vraie vue kanban du modèle cible (identique à la vue standard), clic sur une carte pour ouvrir la fiche
 - Option **"Kanban sans regroupement"** pour afficher les cartes à plat
 - Correction : un favori enregistré depuis une vue non supportée (form, calendar, activity, gantt, map) ne fait plus planter la ligne de tableau de bord
 
-### Version 0.3.0
+### Version 0.3
 - Support complet d'Odoo 18
 - Configuration avancée des champs en mode liste
 - Amélioration de la gestion des droits
