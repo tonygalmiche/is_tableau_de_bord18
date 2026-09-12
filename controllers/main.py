@@ -185,6 +185,10 @@ class TableauDeBordController(http.Controller):
             # Many2one
             if field_type == 'many2one':
                 return self._parse_text_filter(field_name + '.name', filter_value)
+
+            # Many2many / One2many
+            if field_type in ['many2many', 'one2many']:
+                return self._parse_text_filter(field_name + '.name', filter_value)
                 
         except Exception:
             pass
