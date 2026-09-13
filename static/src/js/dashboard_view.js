@@ -23,7 +23,9 @@ class DashboardKanbanView extends Component {
             type: "kanban",
             domain: this.props.domain,
             context: this.props.context,
-            display: { controlPanel: false },
+            // Masque systématiquement le panneau de recherche/statistiques (compteurs, filtres)
+            // que certaines vues Kanban affichent en haut, pour ne garder que les vignettes.
+            display: { controlPanel: false, searchPanel: false },
             selectRecord: this.props.openRecord,
         };
         if (this.props.limit) {

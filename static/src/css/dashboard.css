@@ -62,6 +62,13 @@
     overflow: auto;
 }
 
+/* Masque les bandeaux statistiques que certains modules ajoutent au-dessus des vraies
+   vues Kanban via un js_class dédié (le SearchPanel standard est déjà masqué côté JS
+   via display.searchPanel). Ajouter ici la classe de chaque nouveau bandeau rencontré. */
+.o_kanban_dashboard_tile .o_purchase_dashboard {
+    display: none !important;
+}
+
 /* Classe pour 5 colonnes (20% chacune) */
 .col-md-20 {
     flex: 0 0 20%;
