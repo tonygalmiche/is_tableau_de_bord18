@@ -214,7 +214,12 @@ class IsTableauDeBordLine(models.Model):
     limit = fields.Integer('Limite', default=0, help='Nombre maximum de lignes à afficher (0 = toutes les lignes)')
     list_groupby = fields.Char('Regroupement liste', help='Champs de regroupement pour le mode liste (ex: secteur_id,partner_id). Si défini, affiche une ligne par regroupement avec les totaux des champs numériques.')
     filter_domain     = fields.Char(compute='_compute_filter_domain', store=False)
-    field_ids         = fields.One2many('is.tableau.de.bord.line.field', 'line_id', string='Champs de la liste', copy=True)
+    field_ids         = fields.One2many(
+        'is.tableau.de.bord.line.field', 'line_id', string='Champs', copy=True,
+        help="En mode Liste : choix et ordre des colonnes affichées, avec tri optionnel. "
+             "En mode Kanban : tri uniquement (la colonne 'Visible' n'a pas d'effet), "
+             "selon l'ordre de tri explicite ou, à défaut, l'ordre des lignes.",
+    )
     model_ids         = fields.Many2many('ir.model', compute='_compute_model_ids', store=False, compute_sudo=True)
 
 
@@ -794,11 +799,19 @@ class IsTableauDeBordLine(models.Model):
         # Trier par ordre alphabétique
         field_names.sort()
         
+        # Correspondance nom technique -> ir.model.fields, pour renseigner field_id
+        model_fields = self.env['ir.model.fields'].search([
+            ('model_id', '=', self.model_id.id),
+            ('name', 'in', field_names),
+        ])
+        field_id_by_name = {f.name: f.id for f in model_fields}
+
         # Créer les lignes de champs
         sequence = 10
         for fname in field_names:
             self.field_ids = [(0, 0, {
                 'field_name': fname,
+                'field_id': field_id_by_name.get(fname, False),
                 'visible': True,
                 'sequence': sequence,
             })]
@@ -812,6 +825,7 @@ class IsTableauDeBordLineField(models.Model):
 
     line_id = fields.Many2one('is.tableau.de.bord.line', string='Ligne', required=True, ondelete='cascade')
     sequence = fields.Integer('Séquence', default=10)
+    field_id = fields.Many2one('ir.model.fields', string='Champ', help='Sélection du champ (renseigne automatiquement le nom technique ci-dessous)')
     field_name = fields.Char('Nom du champ', required=True, help='Nom technique du champ')
     field_label = fields.Char('Libellé du champ', compute='_compute_field_label', store=True, readonly=False, help='Libellé affiché du champ')
     visible = fields.Boolean('Visible', default=True, help='Afficher ce champ dans le tableau de bord')
@@ -820,7 +834,12 @@ class IsTableauDeBordLineField(models.Model):
         ('asc', 'Croissant'),
         ('desc', 'Décroissant'),
     ], string='Sens du tri', default='asc', help='Sens du tri pour ce champ')
-    
+
+    @api.onchange('field_id')
+    def _onchange_field_id(self):
+        if self.field_id:
+            self.field_name = self.field_id.name
+
     @api.depends('field_name', 'line_id.model_id')
     def _compute_field_label(self):
         """Calcule le libellé du champ à partir de son nom technique"""

@@ -2,7 +2,11 @@
 
 {
   "name"      : "InfoSaône - Tableau de bord pour Odoo 18",
-  "version"   : "18.0.2.0.5",
+  # /!\ Penser à chaque changement à : 1) incrémenter cette version, 2) ajouter une
+  # entrée dans "Notes de version" du README.md, 3) si une migration de données est
+  # nécessaire, créer migrations/<version>/post-migrate.py (le dossier doit correspondre
+  # exactement à cette version pour être exécuté).
+  "version"   : "18.0.2.0.6",
   "author"    : "InfoSaône / Tony Galmiche",
   "maintainer": "InfoSaône",
   "website"   : "http://www.infosaone.com",

@@ -592,6 +592,31 @@ class TableauDeBordController(http.Controller):
         # Par défaut: liste
         return 'list'
 
+    def _get_field_ids_order_by(self, model, line, use_sequence_fallback=False):
+        """Construit la liste de tri à partir des field_ids de la ligne du tableau de
+        bord (sort_order > 0, triés par sort_order). Utilisé par les modes Liste et
+        Kanban pour ne pas dupliquer cette logique.
+
+        use_sequence_fallback: si aucune ligne n'a de sort_order explicite, utilise
+        l'ordre d'affichage des lignes (sequence) comme tri implicite. Réservé au mode
+        Kanban, où field_ids ne sert qu'au tri (peu de lignes, toutes pertinentes) - en
+        mode Liste, field_ids sert surtout à choisir les colonnes à afficher (souvent
+        des dizaines), ce qui donnerait une clé de tri inutilement longue.
+        """
+        order_by = []
+        if line and line.field_ids:
+            sort_fields = line.field_ids.filtered(lambda f: f.sort_order > 0).sorted('sort_order')
+            if not sort_fields and use_sequence_fallback:
+                sort_fields = line.field_ids.sorted('sequence')
+            for field_config in sort_fields:
+                field_name = field_config.field_name
+                if field_name and field_name in model._fields:
+                    order_by.append({
+                        'name': field_name,
+                        'asc': field_config.sort_direction != 'desc',
+                    })
+        return order_by
+
     def _get_kanban_data(self, model, filter_obj, domain, context, line=None):
         """Prépare les données nécessaires pour monter la vraie vue Kanban Odoo
         du modèle cible côté client (mêmes cartes/templates que la vue kanban standard).
@@ -621,6 +646,7 @@ class TableauDeBordController(http.Controller):
             'domain': clean_for_json(domain),
             'context': clean_for_json(kanban_context),
             'ungroup': ungroup,
+            'order_by': self._get_field_ids_order_by(model, line, use_sequence_fallback=True),
             'limit': limit,
         }
 
@@ -660,21 +686,14 @@ class TableauDeBordController(http.Controller):
                 if line and line.exists() and line.field_ids:
                     # Récupérer uniquement les champs visibles
                     visible_fields = line.field_ids.filtered(lambda f: f.visible).sorted('sequence')
-                    
-                    # Récupérer les champs avec ordre de tri (sort_order > 0)
-                    sort_fields = line.field_ids.filtered(lambda f: f.sort_order > 0).sorted('sort_order')
-                    
-                    if sort_fields:
-                        # Construire la chaîne de tri : "field1 asc, field2 desc, ..."
-                        order_parts = []
-                        for field_config in sort_fields:
-                            field_name = field_config.field_name
-                            direction = field_config.sort_direction or 'asc'
-                            if field_name and field_name in model._fields:
-                                order_parts.append(f"{field_name} {direction}")
-                        if order_parts:
-                            order_string = ', '.join(order_parts)
-                    
+
+                    # Construire la chaîne de tri : "field1 asc, field2 desc, ..."
+                    order_by_list = self._get_field_ids_order_by(model, line)
+                    if order_by_list:
+                        order_string = ', '.join(
+                            f"{o['name']} {'asc' if o['asc'] else 'desc'}" for o in order_by_list
+                        )
+
                     # Maintenant field_name contient le nom technique et field_label le libellé
                     for field_config in visible_fields:
                         field_name = field_config.field_name

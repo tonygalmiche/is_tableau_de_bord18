@@ -15,7 +15,7 @@ import { View } from "@web/views/view";
 class DashboardKanbanView extends Component {
     static template = xml`<View t-props="viewProps"/>`;
     static components = { View };
-    static props = ["resModel", "domain", "context", "openRecord", "ungroup", "limit"];
+    static props = ["resModel", "domain", "context", "openRecord", "ungroup", "orderBy", "limit"];
 
     get viewProps() {
         const props = {
@@ -30,6 +30,9 @@ class DashboardKanbanView extends Component {
         };
         if (this.props.limit) {
             props.limit = this.props.limit;
+        }
+        if (this.props.orderBy && this.props.orderBy.length) {
+            props.orderBy = this.props.orderBy;
         }
         if (this.props.ungroup) {
             // Certaines vues kanban définissent un default_group_by dans leur arch
@@ -695,6 +698,7 @@ export class DashboardFormController extends FormController {
                     domain: data.domain || [],
                     context: data.context || {},
                     ungroup: !!data.ungroup,
+                    orderBy: data.order_by || [],
                     limit: data.limit || null,
                     openRecord: (resId) => this.openKanbanRecord(data.model, resId),
                 },

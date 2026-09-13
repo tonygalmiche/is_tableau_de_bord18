@@ -285,6 +285,12 @@ Les domaines et contextes des recherches enregistrées sont respectés :
 
 ## 📝 Notes de version
 
+### Version 0.6 (18.0.2.0.6)
+- Correction d'affichage des vignettes Kanban : largeur forcée à 100% dans les tuiles du tableau de bord, et retrait d'une classe `flex-row` superflue sur la vue Kanban des maintenances qui empêchait les cartes de s'étirer
+- Masquage systématique du panneau de recherche/statistiques (compteurs, filtres) que certaines vues Kanban affichent en haut (ex : bandeau "Achats en cours" des demandes de prix), pour ne garder que les vignettes
+- **Tri du mode Kanban** : le tableau "Champs" (déjà utilisé en mode Liste) est désormais aussi disponible en mode Kanban pour définir un tri multi-champs (la colonne "Visible" est masquée dans ce cas, sans effet en Kanban)
+- Le champ "Champ" du tableau se sélectionne maintenant directement dans une liste déroulante (`field_id`) au lieu de devoir taper un nom technique ou passer par "Charger tous les champs du modèle"
+
 ### Version 0.5
 - Vignette kanban **"Image seule"** : nouvelle case à cocher `image_only` sur le tableau de bord pour afficher uniquement l'image en plein format (sans titre ni cadre), avec une info bulle (titre + description) qui apparaît au survol
 - Correction : le domaine de l'action fenêtre liée à une recherche enregistrée (`ir.filters.action_id`) est désormais pris en compte en plus du domaine du filtre lui-même, pour les vignettes et l'ouverture en plein écran (évite par exemple l'affichage d'événements passés absents du menu d'origine)

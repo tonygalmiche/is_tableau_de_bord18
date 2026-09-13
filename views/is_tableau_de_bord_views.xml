@@ -155,21 +155,22 @@
                     <group invisible="display_mode != 'kanban'" string="Options du Kanban">
                         <field name="kanban_ungroup" help="Si coché, la vue Kanban s'affiche à plat (sans colonnes), même si le filtre enregistré contient un regroupement."/>
                     </group>
-                    <group invisible="display_mode != 'list'">
+                    <group invisible="display_mode not in ('list', 'kanban')">
                         <field name="field_ids">
                             <list editable="bottom" limit="500">
                                 <field name="sequence" widget="handle"/>
-                                <field name="field_label" string="Champ"/>
-                                <field name="field_name" column_invisible="1"/>
-                                <field name="visible" widget="boolean_toggle"/>
-                                <field name="sort_order" string="Ordre de tri"/>
+                                <field name="field_id" string="Champ" context="{'hide_model': 1}" options="{'no_create': True, 'no_open': True}" domain="[('model_id', '=', parent.model_id)]"/>
+                                <field name="field_name" optional="hide"/>
+                                <field name="field_label" optional="hide"/>
+                                <field name="visible" widget="boolean_toggle" column_invisible="parent.display_mode == 'kanban'"/>
+                                <field name="sort_order" string="Ordre de tri" column_invisible="parent.display_mode == 'kanban'"/>
                                 <field name="sort_direction" string="Sens"/>
                             </list>
                         </field>
                         <div class="mt-2">
-                            <button name="action_load_all_model_fields" 
-                                    string="Charger tous les champs du modèle" 
-                                    type="object" 
+                            <button name="action_load_all_model_fields"
+                                    string="Charger tous les champs du modèle"
+                                    type="object"
                                     class="btn-secondary"
                                     help="Remplace les champs actuels par tous les champs disponibles dans le modèle (hors champs techniques)"/>
                         </div>
