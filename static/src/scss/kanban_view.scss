@@ -175,3 +175,21 @@
         }
     }
 }
+
+/* Certaines vraies vues Kanban montées à l'intérieur d'une tuile (ex: Factures
+   clients, cf. dashboard_view.js / conteneur .o_kanban_dashboard_tile) utilisent
+   dans leur template de carte une grille Bootstrap (row / col-*). Cette grille
+   applique des marges négatives à .row, normalement compensées par le padding
+   du kanban record. Ce padding étant volontairement réduit ci-dessus pour les
+   tuiles du tableau de bord, la grille déborde alors du bord de la carte et se
+   retrouve rognée par le défilement de la tuile. On neutralise donc le gutter
+   Bootstrap dans ce contexte précis, sans toucher au reste du kanban standard. */
+.o_kanban_dashboard_tile .o_kanban_record .row {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+}
+
+.o_kanban_dashboard_tile .o_kanban_record .row > [class*="col-"] {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+}
