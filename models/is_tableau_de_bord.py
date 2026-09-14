@@ -473,12 +473,20 @@ class IsTableauDeBordLine(models.Model):
             
             valid_field_names = filtered_fields
         
+        # Correspondance nom technique -> ir.model.fields, pour renseigner field_id
+        model_fields = self.env['ir.model.fields'].search([
+            ('model_id', '=', self.model_id.id),
+            ('name', 'in', valid_field_names),
+        ])
+        field_id_by_name = {f.name: f.id for f in model_fields}
+
         # Créer les lignes de champs avec leur nom technique
         # Le libellé sera calculé automatiquement par _compute_field_label
         sequence = 10
         for fname in valid_field_names:
             self.field_ids = [(0, 0, {
                 'field_name': fname,  # Nom technique (le label sera calculé automatiquement)
+                'field_id': field_id_by_name.get(fname, False),
                 'visible': True,
                 'sequence': sequence,
             })]
