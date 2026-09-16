@@ -902,10 +902,12 @@ export class DashboardFormController extends FormController {
             }
 
             // Construire les datasets Chart.js avec les couleurs Odoo
+            // Une couleur par série (2e regroupement) dès qu'il y a plusieurs datasets
+            // (empilé ou groupé) ; sinon une couleur par catégorie (1 seul dataset).
             const chartDatasets = datasets.map((ds, index) => ({
                 label: ds.label,
                 data: ds.data,
-                backgroundColor: ds.data.length === 1 || data.stacked
+                backgroundColor: datasets.length > 1
                     ? getColor(index, undefined, datasets.length)
                     : ds.data.map((_, i) => getColor(i, undefined, ds.data.length)),
                 borderWidth: 1,
