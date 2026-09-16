@@ -192,15 +192,32 @@ class IsTableauDeBordLine(models.Model):
         ('count', 'Compte'),
     ], string='Agrégateur', default='sum')
     
-    # Champ générique de sélection de la mesure (remplace la saisie manuelle de graph_measure).
-    # Volontairement générique : pensé pour être réutilisé plus tard par le mode Pivot,
-    # même s'il n'est branché que sur le mode Graphique pour l'instant.
+    # Champs génériques de sélection de la mesure (remplacent la saisie manuelle de graph_measure).
+    # Volontairement génériques : pensés pour être réutilisés plus tard par le mode Pivot,
+    # même s'ils ne sont branchés que sur le mode Graphique pour l'instant.
+    measure_type = fields.Selection([
+        ('count', 'Compteur'),
+        ('sum', 'Somme'),
+        ('ratio', 'Taux'),
+    ], string='Type de mesure', default='count')
     measure_field_id = fields.Many2one(
         'ir.model.fields', string='Champ mesure',
         domain="[('model_id', '=', model_id), ('ttype', 'in', ['integer', 'float', 'monetary', 'boolean'])]",
-        help="Laisser vide pour compter le nombre d'enregistrements.",
+        help="Utilisé quand le type de mesure est 'Somme'.",
     )
-    graph_measure = fields.Char('Graph: Mesure', help='Champ utilisé pour la mesure du graphique. Calculé automatiquement depuis le champ "Champ mesure" ci-dessus.')
+    numerator_field_ids = fields.Many2many(
+        'ir.model.fields', 'is_tableau_de_bord_line_numerator_rel', 'line_id', 'field_id',
+        string='Champs numérateur',
+        domain="[('model_id', '=', model_id), ('ttype', 'in', ['integer', 'float', 'monetary', 'boolean'])]",
+        help="Somme de ces champs pour le numérateur du taux.",
+    )
+    denominator_field_ids = fields.Many2many(
+        'ir.model.fields', 'is_tableau_de_bord_line_denominator_rel', 'line_id', 'field_id',
+        string='Champs dénominateur',
+        domain="[('model_id', '=', model_id), ('ttype', 'in', ['integer', 'float', 'monetary', 'boolean'])]",
+        help="Somme de ces champs pour le dénominateur du taux.",
+    )
+    graph_measure = fields.Char('Graph: Mesure', help='Champ utilisé pour la mesure du graphique. Calculé automatiquement depuis le type de mesure ci-dessus.')
     graph_groupbys = fields.Char('Graph: Groupements', help='Liste des groupements pour le graphique (ex: invoice_date:year). Calculé automatiquement à partir des champs "Regroupement 1/2" ci-dessous.')
 
     # Champs génériques de sélection du regroupement (remplacent la saisie manuelle de graph_groupbys).
@@ -297,6 +314,10 @@ class IsTableauDeBordLine(models.Model):
             self.groupby_field_2_id = False
         if self.measure_field_id and self.measure_field_id.model_id != self.model_id:
             self.measure_field_id = False
+        if any(f.model_id != self.model_id for f in self.numerator_field_ids):
+            self.numerator_field_ids = [(5, 0, 0)]
+        if any(f.model_id != self.model_id for f in self.denominator_field_ids):
+            self.denominator_field_ids = [(5, 0, 0)]
 
         if self.filter_id:
             # Vérifier si le filtre actuel est compatible
@@ -442,13 +463,28 @@ class IsTableauDeBordLine(models.Model):
         ]
         self.graph_groupbys = ','.join(t for t in tokens if t)
 
+    @api.onchange('measure_type')
+    def _onchange_measure_type(self):
+        """Vide les sélecteurs non pertinents pour le type de mesure choisi."""
+        if self.measure_type != 'sum':
+            self.measure_field_id = False
+        if self.measure_type != 'ratio':
+            self.numerator_field_ids = [(5, 0, 0)]
+            self.denominator_field_ids = [(5, 0, 0)]
+        self._onchange_measure_field()
+
     @api.onchange('measure_field_id')
     def _onchange_measure_field(self):
         """Recalcule graph_measure (mode Graphique uniquement pour l'instant) à
-        partir du sélecteur convivial Champ mesure."""
+        partir du type de mesure et du sélecteur convivial Champ mesure.
+        Le type 'Taux' n'est pas encore calculable via graph_measure (champ
+        unique) : la mesure technique reste vide en attendant le calcul dédié."""
         if self.display_mode != 'graph':
             return
-        self.graph_measure = self.measure_field_id.name if self.measure_field_id else False
+        if self.measure_type == 'sum':
+            self.graph_measure = self.measure_field_id.name if self.measure_field_id else False
+        else:
+            self.graph_measure = False
 
     @api.onchange('display_mode')
     def _onchange_display_mode(self):

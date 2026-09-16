@@ -6,7 +6,7 @@
   # entrée dans "Notes de version" du README.md, 3) si une migration de données est
   # nécessaire, créer migrations/<version>/post-migrate.py (le dossier doit correspondre
   # exactement à cette version pour être exécuté).
-  "version"   : "18.0.2.0.7",
+  "version"   : "18.0.2.0.8",
   "author"    : "InfoSaône / Tony Galmiche",
   "maintainer": "InfoSaône",
   "website"   : "http://www.infosaone.com",

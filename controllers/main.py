@@ -1176,14 +1176,17 @@ class TableauDeBordController(http.Controller):
             sort_order = line.pivot_sort_order
         
         groupbys = context.get('graph_groupbys') or context.get('group_by') or []
-        
+
         if isinstance(groupbys, str):
             # Si c'est une chaîne séparée par des virgules, on split
             if ',' in groupbys:
                 groupbys = [g.strip() for g in groupbys.split(',')]
             else:
                 groupbys = [groupbys]
-        
+
+        if line and getattr(line, 'measure_type', 'count') == 'ratio':
+            return self._get_graph_ratio_data(model, domain, groupbys, context, line, sort_by, sort_order, limit)
+
         measure = context.get('graph_measure') or context.get('measure')
         aggregator = context.get('graph_aggregator') or 'sum'
         chart_type = context.get('graph_chart_type') or 'bar'
@@ -1321,6 +1324,115 @@ class TableauDeBordController(http.Controller):
         }
         
         return result
+
+    def _get_graph_ratio_data(self, model, domain, groupbys, context, line, sort_by, sort_order, limit):
+        """Génère les données d'un graphique de type Taux (%) : numérateur / dénominateur,
+        chacun étant la somme d'une liste de champs (measure_type = 'ratio')."""
+        chart_type = context.get('graph_chart_type') or 'bar'
+        show_legend = context.get('graph_show_legend', True)
+        show_data_title = context.get('show_data_title', True)
+        measure_label = "Taux (%)"
+
+        numerator_names = list(dict.fromkeys(line.numerator_field_ids.mapped('name')))
+        denominator_names = list(dict.fromkeys(line.denominator_field_ids.mapped('name')))
+        all_names = list(dict.fromkeys(numerator_names + denominator_names))
+        fields = [f"{name}:sum" for name in all_names]
+
+        try:
+            results = model.read_group(domain, fields=fields, groupby=groupbys, lazy=False) if all_names else []
+        except Exception:
+            results = []
+
+        def get_sum(record, name):
+            return record.get(f"{name}_sum") or record.get(name) or 0
+
+        def compute_ratio(record):
+            num = sum(get_sum(record, name) for name in numerator_names)
+            den = sum(get_sum(record, name) for name in denominator_names)
+            return round(100.0 * num / den, 1) if den else 0.0
+
+        # ── Mode multi-datasets (2 groupements → barres groupées, pas empilées : on ne
+        # peut pas additionner des pourcentages) ───────────────────────────────────
+        if len(groupbys) >= 2 and results:
+            gb0, gb1 = groupbys[0], groupbys[1]
+            x_order = {}
+            series_order = {}
+            matrix = {}
+
+            for r in results:
+                x_label = self._extract_label_from_record(r, gb0)
+                s_label = self._extract_label_from_record(r, gb1)
+                value = compute_ratio(r)
+
+                if x_label not in matrix:
+                    matrix[x_label] = {}
+                    x_order[x_label] = 0
+                matrix[x_label][s_label] = value
+                x_order[x_label] += value
+                series_order[s_label] = True
+
+            x_items = list(x_order.items())
+            reverse = (sort_order == 'desc')
+            if sort_by == 'total':
+                x_items.sort(key=lambda x: x[1], reverse=reverse)
+            else:
+                x_items.sort(key=lambda x: self._sort_key_smart(x[0]), reverse=reverse)
+            if limit and limit > 0:
+                x_items = x_items[:limit]
+            x_labels = [item[0] for item in x_items]
+
+            datasets = []
+            for s_label in series_order.keys():
+                datasets.append({
+                    'label': s_label,
+                    'data': [matrix.get(x, {}).get(s_label, 0) for x in x_labels],
+                })
+
+            return {
+                'type': 'graph',
+                'chart_type': chart_type,
+                'stacked': False,
+                'show_legend': show_legend,
+                'show_data_title': show_data_title,
+                'measure_label': measure_label,
+                'data': {
+                    'labels': x_labels,
+                    'datasets': datasets,
+                }
+            }
+
+        # ── Mode simple (1 groupement) ──────────────────────────────────────────
+        data_list = []
+        for r in results:
+            label = self._extract_label_from_record(r, groupbys[0]) if groupbys else 'Total'
+            data_list.append({'label': label, 'value': compute_ratio(r)})
+
+        reverse = (sort_order == 'desc')
+        if sort_by == 'total':
+            data_list.sort(key=lambda x: x['value'], reverse=reverse)
+        else:
+            data_list.sort(key=lambda x: self._sort_key_smart(x['label']), reverse=reverse)
+        if limit and limit > 0:
+            data_list = data_list[:limit]
+
+        labels = [item['label'] for item in data_list]
+        values = [item['value'] for item in data_list]
+
+        return {
+            'type': 'graph',
+            'chart_type': chart_type,
+            'stacked': False,
+            'show_legend': show_legend,
+            'show_data_title': show_data_title,
+            'measure_label': measure_label,
+            'data': {
+                'labels': labels,
+                'datasets': [{
+                    'label': measure_label,
+                    'data': values,
+                }]
+            }
+        }
 
     def _get_selection_map(self, model, field_name):
         """Récupère le mapping pour un champ Selection"""

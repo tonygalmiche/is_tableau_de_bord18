@@ -285,6 +285,10 @@ Les domaines et contextes des recherches enregistrées sont respectés :
 
 ## 📝 Notes de version
 
+### Version 0.8 (18.0.2.0.8)
+- Mode Graphique : nouveau champ **Type de mesure** (Compteur / Somme / Taux). "Taux" affiche deux sélecteurs multi-champs Numérateur/Dénominateur (chacun sommé), pour calculer un pourcentage (ex: taux de conversion gagné/perdu) par regroupement (secteur, mois, année...).
+- Barres groupées (non empilées) en cas de double regroupement avec le type "Taux", puisque des pourcentages ne s'additionnent pas.
+
 ### Version 0.7 (18.0.2.0.7)
 - Mode Graphique : sélecteurs de champs conviviaux (Regroupement 1/2 + granularité, Champ mesure) à la place de la saisie manuelle de `graph_groupbys`/`graph_measure`, ces derniers restant en lecture seule.
 - Ces champs sont génériques, prévus pour être réutilisés par le mode Pivot plus tard.

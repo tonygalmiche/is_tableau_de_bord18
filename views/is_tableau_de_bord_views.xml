@@ -138,8 +138,11 @@
                             <field name="groupby_period_2" invisible="groupby_field_2_type not in ('date', 'datetime')"/>
                             <field name="graph_groupbys" readonly="1" force_save="1"/>
                         </group>
-                        <group string="Paramètres techniques">
-                            <field name="measure_field_id" options="{'no_create': True, 'no_open': True}"/>
+                        <group string="Mesure">
+                            <field name="measure_type"/>
+                            <field name="measure_field_id" options="{'no_create': True, 'no_open': True}" invisible="measure_type != 'sum'"/>
+                            <field name="numerator_field_ids" widget="many2many_tags" options="{'no_create': True}" invisible="measure_type != 'ratio'"/>
+                            <field name="denominator_field_ids" widget="many2many_tags" options="{'no_create': True}" invisible="measure_type != 'ratio'"/>
                             <field name="graph_measure" readonly="1" force_save="1"/>
                         </group>
                     </group>
