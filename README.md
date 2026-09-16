@@ -285,6 +285,10 @@ Les domaines et contextes des recherches enregistrées sont respectés :
 
 ## 📝 Notes de version
 
+### Version 0.7 (18.0.2.0.7)
+- Mode Graphique : sélecteurs de champs conviviaux (Regroupement 1/2 + granularité, Champ mesure) à la place de la saisie manuelle de `graph_groupbys`/`graph_measure`, ces derniers restant en lecture seule.
+- Ces champs sont génériques, prévus pour être réutilisés par le mode Pivot plus tard.
+
 ### Version 0.6 (18.0.2.0.6)
 - Correction d'affichage des vignettes Kanban : largeur forcée à 100% dans les tuiles du tableau de bord, et retrait d'une classe `flex-row` superflue sur la vue Kanban des maintenances qui empêchait les cartes de s'étirer
 - Masquage systématique du panneau de recherche/statistiques (compteurs, filtres) que certaines vues Kanban affichent en haut (ex : bandeau "Achats en cours" des demandes de prix), pour ne garder que les vignettes

@@ -192,8 +192,35 @@ class IsTableauDeBordLine(models.Model):
         ('count', 'Compte'),
     ], string='Agrégateur', default='sum')
     
-    graph_measure = fields.Char('Graph: Mesure', help='Champ utilisé pour la mesure du graphique')
-    graph_groupbys = fields.Char('Graph: Groupements', help='Liste des groupements pour le graphique (ex: invoice_date:year)')
+    # Champ générique de sélection de la mesure (remplace la saisie manuelle de graph_measure).
+    # Volontairement générique : pensé pour être réutilisé plus tard par le mode Pivot,
+    # même s'il n'est branché que sur le mode Graphique pour l'instant.
+    measure_field_id = fields.Many2one(
+        'ir.model.fields', string='Champ mesure',
+        domain="[('model_id', '=', model_id), ('ttype', 'in', ['integer', 'float', 'monetary', 'boolean'])]",
+        help="Laisser vide pour compter le nombre d'enregistrements.",
+    )
+    graph_measure = fields.Char('Graph: Mesure', help='Champ utilisé pour la mesure du graphique. Calculé automatiquement depuis le champ "Champ mesure" ci-dessus.')
+    graph_groupbys = fields.Char('Graph: Groupements', help='Liste des groupements pour le graphique (ex: invoice_date:year). Calculé automatiquement à partir des champs "Regroupement 1/2" ci-dessous.')
+
+    # Champs génériques de sélection du regroupement (remplacent la saisie manuelle de graph_groupbys).
+    # Volontairement génériques : pensés pour être réutilisés plus tard par les modes Pivot/Liste/Taux,
+    # même s'ils ne sont branchés que sur le mode Graphique pour l'instant.
+    GROUPBY_PERIOD_SELECTION = [
+        ('day', 'Jour'),
+        ('week', 'Semaine'),
+        ('month', 'Mois'),
+        ('quarter', 'Trimestre'),
+        ('year', 'Année'),
+    ]
+
+    groupby_field_1_id = fields.Many2one('ir.model.fields', string='Regroupement 1', domain="[('model_id', '=', model_id)]")
+    groupby_field_1_type = fields.Selection(related='groupby_field_1_id.ttype', string='Type du champ 1', store=False)
+    groupby_period_1 = fields.Selection(GROUPBY_PERIOD_SELECTION, string='Granularité 1', default='month')
+    groupby_field_2_id = fields.Many2one('ir.model.fields', string='Regroupement 2', domain="[('model_id', '=', model_id)]")
+    groupby_field_2_type = fields.Selection(related='groupby_field_2_id.ttype', string='Type du champ 2', store=False)
+    groupby_period_2 = fields.Selection(GROUPBY_PERIOD_SELECTION, string='Granularité 2', default='month')
+
     graph_show_legend = fields.Boolean('Afficher la légende', default=True, help='Afficher ou masquer la légende du graphique')
     show_data_title = fields.Boolean('Afficher le titre des données', default=True, help='Afficher ou masquer le titre du graphique/pivot (ex: "Somme de Total HT" ou "Mesure: Montant")')
     show_record_count = fields.Boolean('Afficher le nombre d\'enregistrements', default=True, help='Afficher ou masquer le compteur d\'enregistrements en bas de liste')
@@ -262,6 +289,14 @@ class IsTableauDeBordLine(models.Model):
 
         if self.model_id:
             self.name = self.model_id.name
+
+        # Réinitialiser les regroupements et la mesure si leur champ n'appartient plus au modèle sélectionné
+        if self.groupby_field_1_id and self.groupby_field_1_id.model_id != self.model_id:
+            self.groupby_field_1_id = False
+        if self.groupby_field_2_id and self.groupby_field_2_id.model_id != self.model_id:
+            self.groupby_field_2_id = False
+        if self.measure_field_id and self.measure_field_id.model_id != self.model_id:
+            self.measure_field_id = False
 
         if self.filter_id:
             # Vérifier si le filtre actuel est compatible
@@ -384,6 +419,36 @@ class IsTableauDeBordLine(models.Model):
         # Recharger systématiquement les champs quand on change de filtre
         if self.display_mode == 'list':
             self._load_list_fields()
+
+    def _build_groupby_token(self, field, period):
+        """Construit un token de regroupement (ex: 'create_date:month') à partir
+        d'un ir.model.fields et d'une granularité. La granularité n'est utilisée
+        que si le champ est une date/datetime, ignorée sinon."""
+        if not field:
+            return False
+        if field.ttype in ('date', 'datetime') and period:
+            return f"{field.name}:{period}"
+        return field.name
+
+    @api.onchange('groupby_field_1_id', 'groupby_period_1', 'groupby_field_2_id', 'groupby_period_2')
+    def _onchange_groupby_fields(self):
+        """Recalcule graph_groupbys (mode Graphique uniquement pour l'instant) à
+        partir des sélecteurs conviviaux Regroupement 1 / Regroupement 2."""
+        if self.display_mode != 'graph':
+            return
+        tokens = [
+            self._build_groupby_token(self.groupby_field_1_id, self.groupby_period_1),
+            self._build_groupby_token(self.groupby_field_2_id, self.groupby_period_2),
+        ]
+        self.graph_groupbys = ','.join(t for t in tokens if t)
+
+    @api.onchange('measure_field_id')
+    def _onchange_measure_field(self):
+        """Recalcule graph_measure (mode Graphique uniquement pour l'instant) à
+        partir du sélecteur convivial Champ mesure."""
+        if self.display_mode != 'graph':
+            return
+        self.graph_measure = self.measure_field_id.name if self.measure_field_id else False
 
     @api.onchange('display_mode')
     def _onchange_display_mode(self):

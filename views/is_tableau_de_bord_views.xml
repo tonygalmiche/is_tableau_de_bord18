@@ -129,9 +129,18 @@
                             <field name="pivot_sort_by"/>
                             <field name="pivot_sort_order"/>
                         </group>
+                        <group string="Regroupements">
+                            <field name="groupby_field_1_id" options="{'no_create': True, 'no_open': True}"/>
+                            <field name="groupby_field_1_type" invisible="1"/>
+                            <field name="groupby_period_1" invisible="groupby_field_1_type not in ('date', 'datetime')"/>
+                            <field name="groupby_field_2_id" options="{'no_create': True, 'no_open': True}"/>
+                            <field name="groupby_field_2_type" invisible="1"/>
+                            <field name="groupby_period_2" invisible="groupby_field_2_type not in ('date', 'datetime')"/>
+                            <field name="graph_groupbys" readonly="1" force_save="1"/>
+                        </group>
                         <group string="Paramètres techniques">
-                            <field name="graph_measure"/>
-                            <field name="graph_groupbys"/>
+                            <field name="measure_field_id" options="{'no_create': True, 'no_open': True}"/>
+                            <field name="graph_measure" readonly="1" force_save="1"/>
                         </group>
                     </group>
                     <group invisible="display_mode != 'pivot'">
@@ -146,6 +155,7 @@
                             <field name="pivot_row_groupby" readonly="1" force_save="1"/>
                             <field name="pivot_col_groupby" readonly="1" force_save="1"/>
                             <field name="pivot_measure" readonly="1" force_save="1"/>
+                            <field name="graph_groupbys" help="Test : utilisé en repli pour le regroupement des lignes du pivot si pivot_row_groupby n'est pas défini (controllers/main.py:1452)."/>
                         </group>
                     </group>
                     <group invisible="display_mode != 'list'">
